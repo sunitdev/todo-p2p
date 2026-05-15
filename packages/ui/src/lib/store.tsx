@@ -15,6 +15,7 @@ import type {
   SyncEngine,
   Todo,
 } from '@todo-p2p/core';
+import { newId } from './id';
 
 export type TodoPatch = Partial<
   Pick<
@@ -31,11 +32,14 @@ export type TodoPatch = Partial<
   >
 >;
 
+export type TodoInput = Omit<Todo, 'id' | 'done' | 'createdAt'> & { id?: string };
+
 export interface StoreValue {
   todos: Todo[];
   areas: Area[];
   projects: Project[];
 
+  addTodo(input: TodoInput): Promise<void>;
   updateTodo(id: string, patch: TodoPatch): Promise<void>;
 
   addArea(input: AreaInput): Promise<void>;
@@ -89,6 +93,7 @@ export function StoreProvider({
       areas: store.listAreas(),
       projects: store.listProjects(),
 
+      addTodo: ({ id, ...rest }) => commit(store.add({ id: id ?? newId(), ...rest })),
       updateTodo: (id, patch) => commit(store.updateTodo(id, patch)),
 
       addArea: (input) => commit(store.addArea(input)),

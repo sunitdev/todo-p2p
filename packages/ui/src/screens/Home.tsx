@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Archive,
   Calendar,
@@ -14,43 +14,15 @@ import {
   Star,
   type LucideIcon,
 } from 'lucide-react';
-import type { Area, Project } from '@todo-p2p/core';
+import type { Area, Project, Todo } from '@todo-p2p/core';
 import { cn } from '../lib/cn';
 import { COLOR_BORDER } from '../lib/palette';
 import { newId } from '../lib/id';
-import { useStore } from '../lib/store';
+import { useStore, type TodoInput } from '../lib/store';
 import { Sidebar, type Selection, type SectionId } from '../components/Sidebar';
 import { AreaForm } from '../components/AreaForm';
 import { ProjectForm } from '../components/ProjectForm';
-
-type DemoTodo = {
-  id: string;
-  title: string;
-  notes?: string;
-  section: SectionId;
-  projectKey?: 'meet' | 'p1' | 'p2';
-  flagged?: boolean;
-};
-
-const DEMO_PROJECTS: Record<NonNullable<DemoTodo['projectKey']>, { title: string; color: 'tint' | 'red' | 'green' }> = {
-  meet: { title: 'Meet Things for Mac', color: 'tint' },
-  p1: { title: 'Project 1', color: 'tint' },
-  p2: { title: 'Project 2', color: 'tint' },
-};
-
-const DEMO: DemoTodo[] = [
-  { id: 'm1', title: 'Create a new to-do', section: 'today', projectKey: 'meet', notes: 'Tap + or press ⌘N' },
-  { id: 'm2', title: 'Add some widgets', section: 'today', projectKey: 'meet', notes: 'Drag from the menu bar' },
-  { id: 'm3', title: 'Set a reminder so you won’t forget', section: 'today', projectKey: 'meet', notes: 'Use the calendar button' },
-  { id: 'p1a', title: 'Project 1 task', section: 'today', projectKey: 'p1' },
-  { id: 'p2a', title: 'Project 2 task', section: 'today', projectKey: 'p2' },
-  { id: 'i1', title: 'Buy milk', section: 'inbox' },
-  { id: 'i2', title: 'Schedule dentist', section: 'inbox' },
-  { id: 'i3', title: 'File expense report', section: 'inbox', flagged: true },
-  { id: 'u1', title: 'Mom’s birthday', section: 'upcoming' },
-  { id: 'u2', title: 'Submit conference talk', section: 'upcoming' },
-  { id: 'u3', title: 'Renew passport', section: 'upcoming', flagged: true },
-];
+import { NewTodoRow, type NewTodoDraft, type ScheduleHint } from '../components/NewTodoRow';
 
 type SectionMeta = { title: string; icon: LucideIcon; tint: string; fill?: boolean };
 
@@ -62,6 +34,32 @@ const SECTION_META: Record<SectionId, SectionMeta> = {
   someday:  { title: 'Someday',  icon: Archive,      tint: 'text-tan' },
   logbook:  { title: 'Logbook',  icon: CheckSquare,  tint: 'text-green' },
 };
+
+function deriveScheduleHint(
+  selection: Selection,
+  selectedProject: Project | null,
+): ScheduleHint {
+  if (selection.kind === 'project' && selectedProject) {
+    return { label: selectedProject.title, icon: Inbox, tint: 'text-blue' };
+  }
+  const id = (selection as { kind: 'section'; id: SectionId }).id;
+  const meta = SECTION_META[id];
+  const hint: ScheduleHint = { label: meta.title, icon: meta.icon, tint: meta.tint };
+  if (meta.fill) hint.fill = true;
+  return hint;
+}
+
+function defaultsForDraft(selection: Selection): TodoInput {
+  if (selection.kind === 'project') return { title: '', projectId: selection.id };
+  switch (selection.id) {
+    case 'today':
+      return { title: '', scheduledWhen: 'today' };
+    case 'someday':
+      return { title: '', scheduledWhen: 'someday' };
+    default:
+      return { title: '' };
+  }
+}
 
 type AreaModal =
   | { mode: 'create' }
@@ -75,6 +73,7 @@ export function Home() {
   const store = useStore();
   const [selection, setSelection] = useState<Selection>({ kind: 'section', id: 'today' });
   const [checked, setChecked] = useState<Set<string>>(new Set());
+  const [draftId, setDraftId] = useState<string | null>(null);
   const [areaModal, setAreaModal] = useState<AreaModal | null>(null);
   const [projectModal, setProjectModal] = useState<ProjectModal | null>(null);
 
@@ -94,16 +93,75 @@ export function Home() {
       return next;
     });
 
-  const visible =
-    selection.kind === 'section'
-      ? DEMO.filter((t) => t.section === selection.id)
-      : [];
+  const visible = useMemo<Todo[]>(() => {
+    if (selection.kind === 'project') {
+      return store.todos.filter((t) => t.projectId === selection.id);
+    }
+    const all = store.todos;
+    switch (selection.id) {
+      case 'inbox':
+        return all.filter((t) => !t.projectId && !t.areaId && !t.done && !t.scheduledWhen);
+      case 'today':
+        return all.filter((t) => !t.done && t.scheduledWhen === 'today');
+      case 'someday':
+        return all.filter((t) => !t.done && t.scheduledWhen === 'someday');
+      case 'anytime':
+        return all.filter((t) => !t.done && t.scheduledWhen !== 'someday');
+      case 'upcoming':
+        return all.filter(
+          (t) => !t.done && typeof t.scheduledFor === 'number' && t.scheduledFor > Date.now(),
+        );
+      case 'logbook':
+        return all.filter((t) => t.done);
+      default:
+        return [];
+    }
+  }, [store.todos, selection]);
 
-  const grouped = visible.reduce<Record<string, DemoTodo[]>>((acc, t) => {
-    const key = t.projectKey ?? '_';
-    (acc[key] ??= []).push(t);
-    return acc;
-  }, {});
+  const startDraft = useCallback(() => setDraftId(newId()), []);
+  const cancelDraft = useCallback(() => setDraftId(null), []);
+
+  const scheduleHint = useMemo<ScheduleHint>(
+    () => deriveScheduleHint(selection, selectedProject),
+    [selection, selectedProject],
+  );
+
+  const commitDraft = useCallback(
+    async (draft: NewTodoDraft) => {
+      const input: TodoInput = { ...defaultsForDraft(selection), ...draft };
+      await store.addTodo(input);
+    },
+    [selection, store],
+  );
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (areaModal || projectModal) return;
+      if (e.key !== 'n' && e.key !== 'N') return;
+      if (e.altKey) return;
+
+      const target = e.target as HTMLElement | null;
+      const inEditable =
+        !!target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable);
+
+      // Cmd/Ctrl+N (desktop) — browsers grab this for "new window"; harmless to try.
+      if (e.metaKey || e.ctrlKey) {
+        e.preventDefault();
+        setDraftId(newId());
+        return;
+      }
+      // Bare `n` when not typing into a field (web-friendly fallback).
+      if (!inEditable) {
+        e.preventDefault();
+        setDraftId(newId());
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [areaModal, projectModal]);
 
   const handleDeleteArea = (a: Area) => {
     if (typeof window !== 'undefined' && !window.confirm(`Delete area "${a.name}"? Projects inside become standalone.`)) {
@@ -122,6 +180,11 @@ export function Home() {
     }
   };
 
+  const showProjectPlaceholder =
+    selection.kind === 'project' && visible.length === 0 && !draftId;
+  const showSectionPlaceholder =
+    selection.kind === 'section' && visible.length === 0 && !draftId;
+
   return (
     <div className="flex h-full w-full bg-bg-l2 text-label">
       <Sidebar
@@ -139,43 +202,49 @@ export function Home() {
 
       <main className="relative flex flex-1 flex-col overflow-hidden">
         <header className="px-8 pt-8 pb-3">
-          {selection.kind === 'project' && selectedProject ? (
-            <ProjectHeader project={selectedProject} />
-          ) : (
-            <SectionHeader meta={SECTION_META[(selection as { kind: 'section'; id: SectionId }).id]} />
-          )}
+          <div className="mx-auto w-full max-w-2xl">
+            {selection.kind === 'project' && selectedProject ? (
+              <ProjectHeader project={selectedProject} />
+            ) : (
+              <SectionHeader meta={SECTION_META[(selection as { kind: 'section'; id: SectionId }).id]} />
+            )}
+          </div>
         </header>
 
         <div className="flex-1 overflow-y-auto px-8 pb-8 pt-2">
-          {selection.kind === 'project' ? (
-            <ProjectEmpty />
-          ) : visible.length === 0 ? (
-            <Empty />
-          ) : (
-            <div className="max-w-3xl space-y-7">
-              {Object.entries(grouped).map(([groupKey, items]) => {
-                const proj = groupKey !== '_' ? DEMO_PROJECTS[groupKey as keyof typeof DEMO_PROJECTS] : null;
-                return (
-                  <section key={groupKey}>
-                    {proj && <ProjectGroupHeading title={proj.title} color={proj.color} />}
-                    <ul className={cn('flex flex-col', proj && 'mt-1')}>
-                      {items.map((t) => (
-                        <TodoRow
-                          key={t.id}
-                          todo={t}
-                          done={checked.has(t.id)}
-                          onToggle={() => toggle(t.id)}
-                        />
-                      ))}
-                    </ul>
-                  </section>
-                );
-              })}
-            </div>
-          )}
+          <div className="mx-auto w-full max-w-2xl">
+            {showProjectPlaceholder ? (
+              <ProjectEmpty />
+            ) : showSectionPlaceholder ? (
+              <Empty />
+            ) : (
+              <ul className="flex flex-col">
+                {draftId && (
+                  <NewTodoRow
+                    key={draftId}
+                    scheduleHint={scheduleHint}
+                    onCommit={async (draft) => {
+                      await commitDraft(draft);
+                      setDraftId(newId());
+                    }}
+                    onCancel={cancelDraft}
+                    onBlurEmpty={cancelDraft}
+                  />
+                )}
+                {visible.map((t) => (
+                  <TodoRow
+                    key={t.id}
+                    todo={t}
+                    done={checked.has(t.id)}
+                    onToggle={() => toggle(t.id)}
+                  />
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
 
-        <MainFooter />
+        <MainFooter onNew={startDraft} />
       </main>
 
       {areaModal?.mode === 'create' && (
@@ -267,23 +336,12 @@ function ProjectHeader({ project }: { project: Project }) {
   );
 }
 
-function ProjectGroupHeading({ title, color }: { title: string; color: 'tint' | 'red' | 'green' }) {
-  const borderClass =
-    color === 'red' ? 'border-red' : color === 'green' ? 'border-green' : 'border-tint';
-  return (
-    <div className="flex items-center gap-2 pb-1">
-      <span className={cn('inline-block size-[14px] shrink-0 rounded-full border-2', borderClass)} />
-      <span className="text-headline font-bold text-label">{title}</span>
-    </div>
-  );
-}
-
 function TodoRow({
   todo,
   done,
   onToggle,
 }: {
-  todo: DemoTodo;
+  todo: Todo;
   done: boolean;
   onToggle: () => void;
 }) {
@@ -337,7 +395,7 @@ function Empty() {
     <div className="flex flex-col items-center justify-center pt-24 text-center">
       <Circle className="size-8 text-label-tertiary" />
       <p className="mt-3 text-callout text-label-secondary">Nothing here yet</p>
-      <p className="mt-1 text-footnote text-label-tertiary">Tap + to add a to-do.</p>
+      <p className="mt-1 text-footnote text-label-tertiary">Tap + or press ⌘N to add a to-do.</p>
     </div>
   );
 }
@@ -347,7 +405,7 @@ function ProjectEmpty() {
     <div className="flex flex-col items-center justify-center pt-24 text-center">
       <Circle className="size-8 text-label-tertiary" />
       <p className="mt-3 text-callout text-label-secondary">No to-dos in this project yet</p>
-      <p className="mt-1 text-footnote text-label-tertiary">Todo↔project wiring lands next.</p>
+      <p className="mt-1 text-footnote text-label-tertiary">Tap + or press ⌘N to add a to-do.</p>
     </div>
   );
 }
@@ -363,11 +421,12 @@ function ToolbarBtn({ icon: Icon, label }: { icon: LucideIcon; label: string }) 
   );
 }
 
-function MainFooter() {
+function MainFooter({ onNew }: { onNew: () => void }) {
   return (
     <footer className="border-t border-separator bg-bg-l1 px-8 py-2" aria-label="Toolbar">
       <div className="flex items-center justify-center gap-16">
         <button
+          onClick={onNew}
           aria-label="New To-Do"
           className="inline-flex size-8 items-center justify-center rounded-full bg-tint text-white hover:opacity-90"
         >

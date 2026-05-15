@@ -67,6 +67,34 @@ describe("SyncEngine", () => {
     expect(storage.changes.length).toBe(0);
   });
 
+  test("open compacts log when snapshot+orphans are loaded (recovery from stale state)", async () => {
+    // Simulate corrupted prior session: snapshot from actor A, log of changes
+    // from actor B that don't connect to A. (Mirrors the user-reported bug
+    // where reload shows 0 todos even though log has 28 entries.)
+    const a = TodoStore.create();
+    const snapBytes = a.save();
+    const b = TodoStore.create(); // fresh actor with disjoint init
+    const orphan1 = b.add({ id: "ghost1", title: "ghost" });
+    const orphan2 = b.add({ id: "ghost2", title: "ghost" });
+
+    const stale = new MemStorage();
+    stale.doc = snapBytes;
+    stale.changes = [orphan1, orphan2];
+
+    const reopened = await SyncEngine.open(stale, new MemTransport());
+
+    // Orphans drop. Compaction re-saves snapshot + truncates log.
+    expect(reopened.todos().list()).toEqual([]);
+    expect(stale.changes.length).toBe(0);
+    expect(stale.truncateCalls).toBeGreaterThan(0);
+
+    // Subsequent commit + reload must surface the new todo (no orphan drift).
+    const fresh = reopened.todos().add({ id: "real", title: "real" });
+    await reopened.commit(fresh, []);
+    const next = await SyncEngine.open(stale, new MemTransport());
+    expect(next.todos().get("real")?.title).toBe("real");
+  });
+
   test("two diverged engines converge after exchanging changes", async () => {
     const storageB = new MemStorage();
     storageB.doc = engine.todos().save();

@@ -1,10 +1,10 @@
 # Components
 
-Each: intent → props → Tailwind snippet → Do/Don't. All shared components live in `packages/ui/src/components/`. Surfaces are flat — no glass, no blur.
+Each: intent → props → Tailwind snippet → Do/Don't. Shared in `packages/ui/src/components/`. Flat surfaces — no glass, no blur.
 
 ## Button
 
-Intent: primary action. Three Things3-flavored variants.
+Intent: primary action. 3 Things3 variants.
 
 | Prop | Type | Default |
 |------|------|---------|
@@ -14,7 +14,7 @@ Intent: primary action. Three Things3-flavored variants.
 | disabled | `boolean` | `false` |
 
 ```tsx
-// pill — used for "New List" w/ trailing label
+// pill — "New List" w/ trailing label
 <button className="inline-flex h-7 items-center gap-1.5 rounded-2 px-2 text-footnote font-medium text-label-secondary hover:bg-bg-l3 hover:text-label">
   <span className="inline-flex size-4 items-center justify-center rounded-full bg-tint text-white">
     <Plus className="size-2.5" />
@@ -22,7 +22,7 @@ Intent: primary action. Three Things3-flavored variants.
   <span>New List</span>
 </button>
 
-// icon — toolbar button, 32px round
+// icon — toolbar 32px round
 <button className="inline-flex size-8 items-center justify-center rounded-full text-label-secondary hover:bg-bg-l3 hover:text-label">
   <Calendar className="size-4" />
 </button>
@@ -31,18 +31,18 @@ Intent: primary action. Three Things3-flavored variants.
 <button className="text-callout text-red hover:underline">Delete</button>
 ```
 
-- Do: 28-32px touch target. Single-fill blue only for the "new" affordance.
-- Don't: gradient/shadow buttons. Don't stack pills horizontally.
+- Do: 28-32px touch. Single-fill blue only for "new" affordance.
+- Don't: gradient/shadow buttons. No stacked pills.
 
 ## ListRow
 
-Intent: scannable row. Compact, ~28px tall, no chevron.
+Intent: scannable row. Compact ~28px, no chevron.
 
 | Prop | Type |
 |------|------|
 | leading | `LucideIcon \| ReactNode` |
 | title | `string` |
-| trailing | `ReactNode` (count badge, optional) |
+| trailing | `ReactNode` (count, optional) |
 | active | `boolean` |
 | onClick | `() => void` |
 
@@ -64,12 +64,12 @@ Intent: scannable row. Compact, ~28px tall, no chevron.
 </button>
 ```
 
-- Do: 14px text, 16px icon, 10px gap, `row-selected` for active state.
-- Don't: chevrons. Don't add a left accent bar — selection is the row fill.
+- Do: 14px text, 16px icon, 10px gap, `row-selected` for active.
+- Don't: chevrons. No left accent bar — selection is row fill.
 
 ## TodoRow
 
-Intent: a single to-do. The dense canonical row.
+Intent: single to-do. Dense canonical row.
 
 ```tsx
 <li className="group flex items-center gap-2 rounded-1 px-1 py-1 hover:bg-bg-l3">
@@ -91,12 +91,10 @@ Intent: a single to-do. The dense canonical row.
 </li>
 ```
 
-- Do: 14px square checkbox w/ 1px border + 3px radius. Body 13px regular weight.
-- Don't: large circular checkboxes (that's iOS Reminders). Don't background-fill due-date pills — plain colored text only.
+- Do: 14px square checkbox, 1px border, 3px radius. Body 13px regular.
+- Don't: large circular checkboxes (iOS Reminders). No background-fill due-date pills — plain colored text.
 
 ## Sheet / Modal
-
-Intent: contextual layer for forms.
 
 ```tsx
 <div className="fixed inset-0 z-40 flex items-center justify-center bg-label/30">
@@ -107,11 +105,9 @@ Intent: contextual layer for forms.
 ```
 
 - Do: flat `bg-bg-l1`, 1px separator border, single ambient shadow.
-- Don't: backdrop-blur, glass, multiple shadow layers.
+- Don't: backdrop-blur, glass, multiple shadows.
 
 ## NavBar / Page header
-
-Intent: title + leading colored icon. No collapse, no chrome.
 
 ```tsx
 <header className="px-8 pt-8 pb-3">
@@ -122,12 +118,10 @@ Intent: title + leading colored icon. No collapse, no chrome.
 </header>
 ```
 
-- Do: title 22/26 bold, icon 24px in semantic tint.
-- Don't: large-title scroll-collapse (Reminders pattern, not Things3). Don't add right-side action buttons — actions live in the bottom toolbar.
+- Do: title 22/26 bold, icon 24px semantic tint.
+- Don't: large-title collapse (Reminders pattern). No right-side action buttons — actions in bottom toolbar.
 
 ## Footer toolbar
-
-Intent: bottom action strip. Four icons.
 
 ```tsx
 <footer className="border-t border-separator bg-bg-l1 px-8 py-2">
@@ -144,8 +138,8 @@ Intent: bottom action strip. Four icons.
 </footer>
 ```
 
-- Do: leading 32px round filled-blue `+`. Trailing icons 32px round, secondary-label color.
-- Don't: text labels on icons. Don't pad the footer past `py-2` — Things3 footer is tight.
+- Do: leading 32px round filled-blue `+`. Trailing icons 32px round, secondary-label.
+- Don't: text labels on icons. Don't pad past `py-2`.
 
 ## TextField
 
@@ -161,7 +155,7 @@ Intent: bottom action strip. Four icons.
 ```
 
 - Do: 32px tall, `bg-bg-l3` inset, 1px focus ring.
-- Don't: glassy backgrounds. Don't use placeholder as label.
+- Don't: glassy bg. No placeholder as label.
 
 ## Toggle
 
@@ -193,26 +187,24 @@ Intent: bottom action strip. Four icons.
 </div>
 ```
 
-- Do: flat `bg-bg-l1` w/ separator border. Destructive items get `text-red`.
+- Do: flat `bg-bg-l1` + separator border. Destructive = `text-red`.
 - Don't: blur, drop-shadow stacks, glass.
 
-## Section header (sidebar / settings)
+## Section header (sidebar/settings)
 
-Repeatable atom defined in `styles.css`:
+Atom in `styles.css`:
 
 ```css
 .section-header { @apply text-caption font-semibold uppercase tracking-wider text-label-tertiary; }
 ```
 
-Use as a `<div className="section-header ...">` for "PROJECTS" / "AREAS" / "DEVICE" group labels.
+Use as `<div className="section-header ...">` for "PROJECTS"/"AREAS"/"DEVICE" labels.
 
 ## Surface (flat card)
-
-Intent: generic content card.
 
 ```tsx
 <div className="rounded-2 border border-separator bg-bg-l1 p-3">{children}</div>
 ```
 
 - Do: pick by stack — sidebar/footer = `bg-bg-l1`; main = `bg-bg-l2`; row hover = `bg-bg-l3`.
-- Don't: stack three different background tiers in one screen. Hierarchy is two-deep max.
+- Don't: 3 different bg tiers in one screen. Hierarchy 2-deep max.

@@ -35,6 +35,22 @@ test.describe('Web app golden path', () => {
     await expect(page.getByText('Launch v2', { exact: true })).toBeVisible();
   });
 
+  test('adding a todo from Today persists across reload', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('main h1')).toHaveText('Today');
+
+    await page.getByRole('button', { name: 'New To-Do' }).click();
+    const title = page.getByRole('textbox', { name: /New to-do title/i });
+    await title.fill('Buy milk');
+    await title.press('Enter');
+
+    await expect(page.getByText('Buy milk', { exact: true })).toBeVisible();
+
+    await page.reload();
+    await expect(page.locator('main h1')).toHaveText('Today');
+    await expect(page.getByText('Buy milk', { exact: true })).toBeVisible();
+  });
+
   test('reload with no data starts cleanly (no leaked state between tests)', async ({ page }) => {
     await page.goto('/');
     await expect(page.locator('main h1')).toHaveText('Today');

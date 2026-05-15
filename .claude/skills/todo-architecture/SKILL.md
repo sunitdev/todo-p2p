@@ -5,31 +5,31 @@ description: todo-p2p architecture — UI/core split, adapters, runtime adapter 
 
 # Architecture
 
-Repo layout:
+Layout:
 - `apps/web` (Vite+React+Tailwind v4) → browser + Tauri webview
 - `apps/desktop` (Tauri 2 + Rust) → loads `apps/web` build
-- `apps/mobile` (Expo + RN + NativeWind) → planned; iOS + Android
+- `apps/mobile` (Expo+RN+NativeWind) → planned iOS+Android
 - `packages/core` (pure TS) → CRDT, sync engine, identity, pairing, adapter ifaces
-- `packages/ui` (React + Tailwind v4) → shared screens/components for web + mobile (NativeWind reuses same `@theme` tokens)
-- `infra/docker/` → web dev container (Bun + Vite)
+- `packages/ui` (React+Tailwind v4) → shared screens/components; NativeWind reuses same `@theme` tokens
+- `infra/docker/` → web dev container (Bun+Vite)
 - `tooling/{typescript,eslint}` → shared configs
-- `docs/ARCHITECTURE.md` → human-readable long-form
+- `docs/ARCHITECTURE.md` → long-form
 
-Core interfaces in `packages/core/src/adapters/`: `StorageAdapter`, `TransportAdapter`, `SecureKeyStore`. 6 adapter packages impl them across 3 hosts.
+Core ifaces in `packages/core/src/adapters/`: `StorageAdapter`, `TransportAdapter`, `SecureKeyStore`. 6 adapter packages impl across 3 hosts.
 
-Runtime pick: `apps/web` automatically selects Tauri or WASM adapters based on whether `window.__TAURI__` is present.
+Runtime pick: `apps/web` selects Tauri or WASM adapters based on `window.__TAURI__` presence.
 
-Testability: `syncEngine.ts` talks only to interfaces → Node-testable.
+Testability: `syncEngine.ts` talks only to ifaces → Node-testable.
 
-SyncEngine invariant: first persist after cold start with empty storage MUST `saveDoc(store.save())` (not `appendChange`). Snapshot embeds the Automerge actor's `init`; otherwise reload calls `TodoStore.create()` (fresh actor) and the logged change's dep on the old init can't resolve — `applyChange` silently no-ops and the write is lost.
+**SyncEngine invariant**: first persist after cold start w/ empty storage MUST `saveDoc(store.save())` (not `appendChange`). Snapshot embeds Automerge actor's `init`; else reload calls `TodoStore.create()` (fresh actor) → logged change's dep on old init can't resolve → `applyChange` silently no-ops → write lost.
 
 Pairing (QR):
-1. Existing device shows a single-use iroh ticket and a 6-word fingerprint.
-2. New device scans the QR and dials over iroh.
-3. Devices complete the Noise handshake.
-4. Both devices display fingerprints; user confirms they match out-of-band.
-5. If fingerprints do not match or connection fails, pairing is rejected and the user must retry with a new ticket.
-6. On success, devices run full Automerge sync.
-7. Peers persist a trusted-peers list; reconnect authentication uses signatures.
+1. Existing device shows single-use iroh ticket + 6-word fingerprint.
+2. New device scans QR, dials over iroh.
+3. Noise handshake.
+4. Both show fingerprints; user confirms match out-of-band.
+5. Mismatch/fail → rejected, retry w/ new ticket.
+6. On success → full Automerge sync.
+7. Persist trusted-peers list; reconnect auth = signatures.
 
-No recovery: if all devices are permanently lost or inaccessible, data is gone. "Export backup" = user-managed encrypted Automerge snapshot. Surface clearly. Never auto-upload.
+No recovery: all devices lost = data gone. "Export backup" = user-managed encrypted Automerge snapshot. Surface clearly. Never auto-upload.

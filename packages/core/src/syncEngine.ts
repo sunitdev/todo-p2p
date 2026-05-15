@@ -33,6 +33,20 @@ export class SyncEngine {
     const changes = await storage.loadChanges();
     for (const c of changes) store.applyChange(c);
 
+    // Compact on open when the log is non-empty: re-save snapshot to match the
+    // in-memory doc, then drop the log. Anchors future commits' deps to the
+    // persisted snapshot's heads — orphan log entries (from a prior session's
+    // actor) would otherwise silently strand new writes on reload. try/catch
+    // tolerates the concurrent-modify race under StrictMode dev double-mount.
+    if (snapshot !== null && changes.length > 0) {
+      try {
+        await storage.saveDoc(store.save());
+        await storage.truncateChanges();
+      } catch {
+        // Benign: another concurrent open is compacting the same files.
+      }
+    }
+
     const engine = new SyncEngine(store, storage, transport);
     engine.hasSnapshot = snapshot !== null;
     engine.unsubscribers.push(

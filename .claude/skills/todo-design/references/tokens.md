@@ -1,8 +1,8 @@
 # Tokens
 
-All values exact. Drop into Tailwind v4 `@theme` block in `packages/ui/src/styles.css`.
+Exact values. Drop into Tailwind v4 `@theme` in `packages/ui/src/styles.css`.
 
-## Color — semantic labels
+## Color — labels
 
 | Token | Light | Dark |
 |-------|-------|------|
@@ -16,9 +16,9 @@ All values exact. Drop into Tailwind v4 `@theme` block in `packages/ui/src/style
 
 | Token | Light | Dark | Use |
 |-------|-------|------|-----|
-| bg-l1 | #F5F5F4 | #2C2C2E | sidebar, modal, footer chrome |
-| bg-l2 | #FAFAFA | #1C1C1E | main content pane |
-| bg-l3 | #E8E8E6 | #3A3A3C | row hover, subtle inset |
+| bg-l1 | #F5F5F4 | #2C2C2E | sidebar, modal, footer |
+| bg-l2 | #FAFAFA | #1C1C1E | main content |
+| bg-l3 | #E8E8E6 | #3A3A3C | row hover, inset |
 
 ## Color — selection + tint
 
@@ -27,7 +27,7 @@ All values exact. Drop into Tailwind v4 `@theme` block in `packages/ui/src/style
 | tint | #007AFF | #0A84FF |
 | row-selected | #007AFF | #0A84FF |
 
-`row-selected` is its own var so the selection fill can drift from `tint` later (Things3 historically uses a near-tint that picks up Mac accent color).
+`row-selected` own var so selection fill can drift from `tint` (Things3 historically uses near-tint that picks up Mac accent).
 
 ## Color — semantic (sidebar + flag)
 
@@ -40,30 +40,30 @@ All values exact. Drop into Tailwind v4 `@theme` block in `packages/ui/src/style
 | tan | #C7A06A | #C7A06A | Someday |
 | green | #3FA34D | #3FA34D | Logbook |
 | orange | #FF9F0A | #FF9F0A | Flag |
-| indigo / purple / pink / gray | — | — | project/area palette |
+| indigo/purple/pink/gray | — | — | project/area palette |
 
-No decorative hex anywhere. Pick a semantic var or extend this table.
+No decorative hex. Pick semantic var or extend.
 
 ## Type ramp (SF Pro, tight)
 
-| Style | Size / Line | Weight | Use |
-|-------|-------------|--------|-----|
-| title | 22 / 26 | bold | page heading (Today, Inbox, project name) |
-| headline | 15 / 20 | bold | group headings ("This Morning") |
-| callout | 14 / 18 | regular | sidebar rows, secondary action buttons |
-| body | 13 / 17 | regular | todo title default |
-| footnote | 12 / 16 | regular | notes preview, count badges, helper labels |
-| caption | 11 / 14 | regular | tags, due-date inline text |
+| Style | Size/Line | Weight | Use |
+|-------|-----------|--------|-----|
+| title | 22/26 | bold | page heading |
+| headline | 15/20 | bold | group headings |
+| callout | 14/18 | regular | sidebar rows, secondary buttons |
+| body | 13/17 | regular | todo title default |
+| footnote | 12/16 | regular | notes preview, count badges |
+| caption | 11/14 | regular | tags, due-date inline |
 
-Drop everything else (`title1/2/3`, `largetitle`, `subhead`). The Things3 ramp is six steps, not ten.
+Drop all else. Ramp = 6 steps, not 10.
 
 ## Space scale (4pt grid)
 
-`--spacing: 4px` base. Standard step set: `4, 6, 8, 10, 12, 16, 20, 24, 32`. Rows are 28px (`h-7`). Sidebar gutter is 8px (`px-2`). Main pane gutter is 32px (`px-8`).
+`--spacing: 4px` base. Set: `4, 6, 8, 10, 12, 16, 20, 24, 32`. Rows 28px (`h-7`). Sidebar gutter 8px (`px-2`). Main pane gutter 32px (`px-8`).
 
 ## Radius scale
 
-`4, 8, 12, 16, 22`. Default for hover/select pills = `rounded-2` (8). Modals = `rounded-4` (16). Avoid `rounded-5` — Things3 never uses pill-rounded cards.
+`4, 8, 12, 16, 22`. Hover/select pills = `rounded-2` (8). Modals = `rounded-4` (16). Avoid `rounded-5` — Things3 never uses pill-rounded cards.
 
 ## Shadow
 
@@ -71,15 +71,15 @@ Drop everything else (`title1/2/3`, `largetitle`, `subhead`). The Things3 ramp i
 |-------|--------|------|---------------|--------------|
 | ambient | 0,1 | 2 | rgba(0,0,0,0.06) | rgba(0,0,0,0.4) |
 
-Single shadow. No `key`, no `glow`. Things3 uses one subtle drop and 1px separators for hierarchy.
+Single shadow. No `key`/`glow`.
 
 ## Motion
 
-Single curve: ease-out, 150ms. Tailwind `transition-colors` is enough for hover. Never spring. Respect `prefers-reduced-motion`.
+ease-out 150ms. `transition-colors` enough for hover. Never spring. Respect `prefers-reduced-motion`.
 
 ## Tailwind v4 `@theme` skeleton
 
-Tokens live as CSS custom properties in `packages/ui/src/styles.css`. Dark variants flip via `prefers-color-scheme: dark`.
+Tokens = CSS custom props in `packages/ui/src/styles.css`. Dark flips via `prefers-color-scheme: dark`.
 
 ```css
 @import "tailwindcss";
@@ -154,4 +154,4 @@ Tokens live as CSS custom properties in `packages/ui/src/styles.css`. Dark varia
 }
 ```
 
-No glass-material classes. No blur tokens. No spring tables.
+No glass classes. No blur tokens. No spring tables.

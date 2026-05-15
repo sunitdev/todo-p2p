@@ -20,6 +20,39 @@ describe('StoreProvider / useStore', () => {
     expect(result.current.projects).toEqual([]);
   });
 
+  test('addTodo commits and surfaces todo', async () => {
+    const engine = new FakeEngine();
+    const { result } = renderHook(() => useStore(), { wrapper: wrapper(engine) });
+    await act(async () => {
+      await result.current.addTodo({ title: 'Buy milk' });
+    });
+    expect(engine.commits.length).toBe(1);
+    expect(engine.commits[0]).toBeInstanceOf(Uint8Array);
+    const todos = result.current.todos;
+    expect(todos.length).toBe(1);
+    expect(todos[0]?.title).toBe('Buy milk');
+    expect(todos[0]?.done).toBe(false);
+    expect(typeof todos[0]?.id).toBe('string');
+  });
+
+  test('addTodo honors provided id', async () => {
+    const engine = new FakeEngine();
+    const { result } = renderHook(() => useStore(), { wrapper: wrapper(engine) });
+    await act(async () => {
+      await result.current.addTodo({ id: 'fixed-id', title: 'Pinned' });
+    });
+    expect(result.current.todos.map((t) => t.id)).toEqual(['fixed-id']);
+  });
+
+  test('addTodo with projectId roundtrips through store', async () => {
+    const engine = new FakeEngine();
+    const { result } = renderHook(() => useStore(), { wrapper: wrapper(engine) });
+    await act(async () => {
+      await result.current.addTodo({ title: 'Spec', projectId: 'p1' });
+    });
+    expect(result.current.todos[0]?.projectId).toBe('p1');
+  });
+
   test('addArea calls engine.commit once with bytes', async () => {
     const engine = new FakeEngine();
     const { result } = renderHook(() => useStore(), { wrapper: wrapper(engine) });

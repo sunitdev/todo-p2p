@@ -142,7 +142,8 @@ export class WebStorageAdapter implements StorageAdapter {
     try {
       await this.root.removeEntry(name);
     } catch (e) {
-      if (!isNotFound(e)) throw e;
+      if (isNotFound(e) || isNoModification(e)) return;
+      throw e;
     }
   }
 }
@@ -184,4 +185,8 @@ function concat(a: Uint8Array, b: Uint8Array): Uint8Array {
 
 function isNotFound(e: unknown): boolean {
   return e instanceof DOMException && e.name === 'NotFoundError';
+}
+
+function isNoModification(e: unknown): boolean {
+  return e instanceof DOMException && e.name === 'NoModificationAllowedError';
 }
