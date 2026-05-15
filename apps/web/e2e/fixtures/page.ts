@@ -1,12 +1,11 @@
 import { test as base, expect } from '@playwright/test';
 
-/**
- * Clears OPFS + IndexedDB on each test so persistence assertions start fresh.
- * Must run BEFORE the page navigates so the app boots against empty storage.
- */
+// Clears OPFS + IndexedDB once per test (gated by sessionStorage so page.reload
+// doesn't re-wipe state that the test is asserting survives).
 export const test = base.extend({
   page: async ({ page }, use) => {
     await page.addInitScript(async () => {
+      if (sessionStorage.getItem('todo-p2p-test-cleared')) return;
       try {
         const root = await navigator.storage.getDirectory();
         // @ts-expect-error - keys() exists on FileSystemDirectoryHandle in modern browsers
@@ -26,6 +25,7 @@ export const test = base.extend({
       } catch {
         /* ignore */
       }
+      sessionStorage.setItem('todo-p2p-test-cleared', '1');
     });
     await use(page);
   },

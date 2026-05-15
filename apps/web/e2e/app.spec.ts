@@ -8,12 +8,7 @@ test.describe('Web app golden path', () => {
     await expect(page.locator('main h1')).toHaveText('Today');
   });
 
-  // SKIP: Known issue — SyncEngine.open() creates a fresh TodoStore (new Automerge
-  // actor id) when no snapshot is present. The changes log from the previous session
-  // carries dependencies tied to the OLD actor's `init` change, so applyChange()
-  // silently no-ops on reload. Fix is to persist a snapshot on first commit; out of
-  // scope for the test-coverage task. This spec is the regression target for that fix.
-  test.skip('adding an area + project persists across reload (OPFS + IDB CryptoKey end-to-end)', async ({
+  test('adding an area + project persists across reload (OPFS + IDB CryptoKey end-to-end)', async ({
     page,
   }) => {
     await page.goto('/');

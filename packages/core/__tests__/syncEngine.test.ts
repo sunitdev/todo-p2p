@@ -19,13 +19,33 @@ describe("SyncEngine", () => {
     expect(engine.todos().list()).toEqual([]);
   });
 
-  test("commit appends change to storage and emits local-change", async () => {
+  test("first commit on empty storage persists snapshot (not append) so actor init survives reload", async () => {
     const events: string[] = [];
     engine.on((e) => events.push(e.kind));
     const change = engine.todos().add({ id: "a", title: "x" });
     await engine.commit(change, []);
-    expect(storage.changes.length).toBe(1);
+    expect(storage.saveDocCalls).toBe(1);
+    expect(storage.doc).not.toBeNull();
+    expect(storage.changes.length).toBe(0);
     expect(events).toContain("local-change");
+  });
+
+  test("subsequent commits append change to log (no extra snapshot)", async () => {
+    const c1 = engine.todos().add({ id: "a", title: "x" });
+    await engine.commit(c1, []);
+    const c2 = engine.todos().add({ id: "b", title: "y" });
+    await engine.commit(c2, []);
+    expect(storage.saveDocCalls).toBe(1);
+    expect(storage.changes.length).toBe(1);
+  });
+
+  test("first commit survives a simulated reload (regression for skipped e2e)", async () => {
+    const change = engine.todos().add({ id: "x", title: "survive" });
+    await engine.commit(change, []);
+    await engine.close();
+
+    const reopened = await SyncEngine.open(storage, new MemTransport());
+    expect(reopened.todos().get("x")?.title).toBe("survive");
   });
 
   test("incoming message merges into local store", async () => {

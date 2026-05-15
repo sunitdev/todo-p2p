@@ -18,6 +18,7 @@ export class SyncEngine {
   private unsubscribers: Unsubscribe[] = [];
   private snapshotEvery = 50;
   private appendsSinceSnapshot = 0;
+  private hasSnapshot = false;
 
   constructor(
     private readonly store: TodoStore,
@@ -33,6 +34,7 @@ export class SyncEngine {
     for (const c of changes) store.applyChange(c);
 
     const engine = new SyncEngine(store, storage, transport);
+    engine.hasSnapshot = snapshot !== null;
     engine.unsubscribers.push(
       transport.onMessage((peerId, payload) => {
         void engine.handleRemote(peerId, payload);
@@ -53,8 +55,7 @@ export class SyncEngine {
   /** Apply a local mutation and broadcast its change to all paired peers. */
   async commit(change: Uint8Array, peers: { send(p: Uint8Array): Promise<void> }[]): Promise<void> {
     try {
-      await this.storage.appendChange(change);
-      this.appendsSinceSnapshot++;
+      await this.persistChange(change);
       this.emit({ kind: "local-change", bytes: change });
       await Promise.all(peers.map((p) => p.send(change).catch((e) => this.emitErr(e, "send"))));
       await this.maybeSnapshot();
@@ -67,13 +68,28 @@ export class SyncEngine {
     try {
       const changed = this.store.applyChange(payload);
       if (!changed) return;
-      await this.storage.appendChange(payload);
-      this.appendsSinceSnapshot++;
+      await this.persistChange(payload);
       this.emit({ kind: "remote-change", peerId, bytes: payload });
       await this.maybeSnapshot();
     } catch (e) {
       this.emitErr(e, "apply");
     }
+  }
+
+  // First write after cold start with empty storage must snapshot, not append:
+  // the snapshot embeds the actor's `init` so reload's `TodoStore.load()` keeps
+  // the same actor graph (a fresh `create()` would mint a new actor, leaving the
+  // logged change with an unresolvable dep and a silent applyChange no-op).
+  private async persistChange(change: Uint8Array): Promise<void> {
+    if (!this.hasSnapshot) {
+      await this.storage.saveDoc(this.store.save());
+      this.hasSnapshot = true;
+      this.appendsSinceSnapshot = 0;
+      this.emit({ kind: "snapshot-saved" });
+      return;
+    }
+    await this.storage.appendChange(change);
+    this.appendsSinceSnapshot++;
   }
 
   private async maybeSnapshot(): Promise<void> {

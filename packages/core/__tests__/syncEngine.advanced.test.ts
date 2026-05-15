@@ -22,6 +22,7 @@ describe("SyncEngine advanced", () => {
 
   test("commit emits error 'send' when peer.send rejects but storage still wrote", async () => {
     const storage = new MemStorage();
+    storage.doc = TodoStore.create().save();
     const engine = await SyncEngine.open(storage, new MemTransport());
     const events: SyncEvent[] = [];
     engine.on((e) => events.push(e));
@@ -39,11 +40,27 @@ describe("SyncEngine advanced", () => {
 
   test("commit emits error 'save' when appendChange rejects", async () => {
     const storage = new MemStorage();
+    storage.doc = TodoStore.create().save();
     const engine = await SyncEngine.open(storage, new MemTransport());
     const events: SyncEvent[] = [];
     engine.on((e) => events.push(e));
 
     storage.failNext.appendChange = new Error("disk full");
+    const change = engine.todos().add({ id: "a", title: "x" });
+    await engine.commit(change, []);
+
+    const err = events.find((e) => e.kind === "error");
+    expect(err?.kind).toBe("error");
+    if (err?.kind === "error") expect(err.phase).toBe("save");
+  });
+
+  test("commit emits error 'save' when first-commit saveDoc rejects", async () => {
+    const storage = new MemStorage();
+    const engine = await SyncEngine.open(storage, new MemTransport());
+    const events: SyncEvent[] = [];
+    engine.on((e) => events.push(e));
+
+    storage.failNext.saveDoc = new Error("disk full");
     const change = engine.todos().add({ id: "a", title: "x" });
     await engine.commit(change, []);
 
@@ -81,7 +98,7 @@ describe("SyncEngine advanced", () => {
     expect(storage.truncateCalls).toBe(0);
   });
 
-  test("snapshot triggers at 50 appends and resets the counter", async () => {
+  test("snapshot triggers every 50 appends since last snapshot", async () => {
     const storage = new MemStorage();
     const engine = await SyncEngine.open(storage, new MemTransport());
     let snapshots = 0;
@@ -89,18 +106,28 @@ describe("SyncEngine advanced", () => {
       if (e.kind === "snapshot-saved") snapshots++;
     });
 
-    for (let i = 0; i < 50; i++) {
-      const c = engine.todos().add({ id: `t${i}`, title: String(i) });
-      await engine.commit(c, []);
-    }
+    const c0 = engine.todos().add({ id: "t0", title: "0" });
+    await engine.commit(c0, []);
     expect(snapshots).toBe(1);
     expect(storage.saveDocCalls).toBe(1);
     expect(storage.changes.length).toBe(0);
 
-    // One more commit must NOT trigger another snapshot.
-    const c = engine.todos().add({ id: "extra", title: "extra" });
-    await engine.commit(c, []);
+    for (let i = 1; i <= 49; i++) {
+      const c = engine.todos().add({ id: `t${i}`, title: String(i) });
+      await engine.commit(c, []);
+    }
     expect(snapshots).toBe(1);
+    expect(storage.changes.length).toBe(49);
+
+    const c50 = engine.todos().add({ id: "t50", title: "50" });
+    await engine.commit(c50, []);
+    expect(snapshots).toBe(2);
+    expect(storage.saveDocCalls).toBe(2);
+    expect(storage.changes.length).toBe(0);
+
+    const cExtra = engine.todos().add({ id: "extra", title: "extra" });
+    await engine.commit(cExtra, []);
+    expect(snapshots).toBe(2);
   });
 
   test("after close, transport messages no longer mutate the store", async () => {

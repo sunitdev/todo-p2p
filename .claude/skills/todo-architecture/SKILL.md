@@ -21,6 +21,8 @@ Runtime pick: `apps/web` automatically selects Tauri or WASM adapters based on w
 
 Testability: `syncEngine.ts` talks only to interfaces → Node-testable.
 
+SyncEngine invariant: first persist after cold start with empty storage MUST `saveDoc(store.save())` (not `appendChange`). Snapshot embeds the Automerge actor's `init`; otherwise reload calls `TodoStore.create()` (fresh actor) and the logged change's dep on the old init can't resolve — `applyChange` silently no-ops and the write is lost.
+
 Pairing (QR):
 1. Existing device shows a single-use iroh ticket and a 6-word fingerprint.
 2. New device scans the QR and dials over iroh.
