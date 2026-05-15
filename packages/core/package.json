@@ -1,0 +1,22 @@
+{
+  "name": "@todo-p2p/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./adapters": "./src/adapters/index.ts"
+  },
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc -b --noEmit"
+  },
+  "dependencies": {
+    "@automerge/automerge": "2.2.8",
+    "@noble/curves": "1.6.0",
+    "@noble/hashes": "1.5.0",
+    "@scure/bip39": "1.4.0"
+  }
+}
