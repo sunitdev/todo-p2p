@@ -6,11 +6,11 @@ description: todo-p2p architecture — UI/core split, adapters, runtime adapter 
 # Architecture
 
 Repo layout:
-- `apps/web` (Vite+React+Tamagui) → browser + Tauri webview
+- `apps/web` (Vite+React+Tailwind v4) → browser + Tauri webview
 - `apps/desktop` (Tauri 2 + Rust) → loads `apps/web` build
-- `apps/mobile` (Expo + RN + Tamagui) → planned; iOS + Android
+- `apps/mobile` (Expo + RN + NativeWind) → planned; iOS + Android
 - `packages/core` (pure TS) → CRDT, sync engine, identity, pairing, adapter ifaces
-- `packages/ui` (Tamagui) → shared screens/components for web + mobile
+- `packages/ui` (React + Tailwind v4) → shared screens/components for web + mobile (NativeWind reuses same `@theme` tokens)
 - `infra/docker/` → web dev container (Bun + Vite)
 - `tooling/{typescript,eslint}` → shared configs
 - `docs/ARCHITECTURE.md` → human-readable long-form

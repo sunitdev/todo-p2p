@@ -1,0 +1,15 @@
+# Extends gitleaks built-in ruleset. Add allowlist entries when default rules
+# trip on benign hashes/checksums in lockfiles or generated config.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Global false-positive allowlist for todo-p2p"
+paths = [
+  '''(^|/)bun\.lock$''',
+  '''(^|/)Cargo\.lock$''',
+  '''(^|/)node_modules/''',
+  '''(^|/)target/''',
+  '''(^|/)dist/''',
+  '''(^|/)\.tsbuildinfo$''',
+]

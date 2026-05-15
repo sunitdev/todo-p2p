@@ -1,33 +1,37 @@
+# Deps
 node_modules/
-dist/
-build/
-.DS_Store
-*.log
-.env
-.env.local
-.env.*.local
-
-# Bun
-bun.lockb
 .bun/
 
-# TypeScript
+# Build artifacts
+dist/
+build/
 *.tsbuildinfo
 
-# Editors
-.vscode/
-.idea/
-
-# Tauri (future)
+# Rust / Tauri
 target/
-src-tauri/target/
+apps/desktop/src-tauri/target/
+apps/desktop/src-tauri/gen/schemas/
 
-# Expo (future)
+# Expo (mobile, planned)
 .expo/
 ios/Pods/
 android/.gradle/
 android/build/
 android/app/build/
 
-# Test
+# Tests
 coverage/
+
+# Editors
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs / env
+*.log
+.env
+.env.local
+.env.*.local

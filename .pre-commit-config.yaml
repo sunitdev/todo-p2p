@@ -1,0 +1,68 @@
+default_install_hook_types: [pre-commit, pre-push]
+default_stages: [pre-commit]
+fail_fast: false
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-merge-conflict
+      - id: check-yaml
+      - id: check-json
+        exclude: ^(\.vscode/|apps/desktop/src-tauri/tauri\.conf\.json$)
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks
+
+  - repo: local
+    hooks:
+      - id: eslint-staged
+        name: eslint (staged TS/JS)
+        language: system
+        entry: bunx --bun eslint --fix --no-warn-ignored
+        types_or: [ts, tsx, javascript, jsx]
+        exclude: ^(node_modules/|.*\.d\.ts$)
+        require_serial: true
+
+      - id: cargo-fmt
+        name: cargo fmt (src-tauri)
+        language: system
+        entry: bash -c 'cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml --all'
+        files: ^apps/desktop/src-tauri/.*\.rs$
+        pass_filenames: false
+
+      - id: cargo-clippy
+        name: cargo clippy (src-tauri, -D warnings)
+        language: system
+        entry: bash -c 'cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --all-targets -- -D warnings'
+        files: ^apps/desktop/src-tauri/.*\.(rs|toml)$
+        pass_filenames: false
+
+      - id: forbidden-pkg-managers
+        name: block npm/yarn/pnpm (bun-only repo)
+        language: system
+        entry: bash scripts/hooks/forbidden-pkg-managers.sh
+        pass_filenames: true
+        require_serial: true
+
+      - id: typecheck
+        name: typecheck (tsc -b)
+        language: system
+        entry: bun run typecheck
+        stages: [pre-push]
+        pass_filenames: false
+        always_run: true
+
+      - id: tests
+        name: unit tests
+        language: system
+        entry: bun run test
+        stages: [pre-push]
+        pass_filenames: false
+        always_run: true

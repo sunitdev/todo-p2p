@@ -6,12 +6,23 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./styles.css": "./src/styles.css"
   },
   "scripts": {
-    "typecheck": "tsc -b --noEmit"
+    "typecheck": "tsc -b"
+  },
+  "peerDependencies": {
+    "react": "18.3.1"
   },
   "dependencies": {
-    "@todo-p2p/core": "workspace:*"
+    "@todo-p2p/core": "workspace:*",
+    "clsx": "2.1.1",
+    "lucide-react": "0.460.0",
+    "tailwind-merge": "3.6.0"
+  },
+  "devDependencies": {
+    "@types/react": "18.3.12",
+    "react": "18.3.1"
   }
 }

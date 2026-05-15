@@ -8,9 +8,11 @@
     "packages/*"
   ],
   "scripts": {
-    "typecheck": "tsc -b --noEmit",
+    "typecheck": "tsc -b && bun --filter @todo-p2p/web typecheck",
     "lint": "eslint .",
-    "test": "bun --filter './packages/*' test"
+    "test": "bun --filter './packages/*' test",
+    "hooks:install": "pre-commit install --install-hooks && pre-commit install --hook-type pre-push",
+    "hooks:run": "pre-commit run --all-files"
   },
   "devDependencies": {
     "typescript": "5.6.3",

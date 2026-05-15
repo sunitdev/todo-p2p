@@ -4,13 +4,13 @@ Serverless E2EE personal TODO. P2P sync via iroh between user's own devices. No 
 
 ## Stack
 
-Desktop=Tauri 2 (Rust+iroh crate+SQLCipher/rusqlite+keyring). Web=Vite+React+Tamagui (iroh-js WASM in Worker, wa-sqlite+OPFS+AES-GCM). Mobile=Expo+RN+Tamagui (iroh-ffi Expo Module, op-sqlite+SQLCipher). Core=`packages/core` pure TS, adapter ifaces. Bun workspaces monorepo; Bun=pkg mgr+runner+test runner. Node only via Metro.
+Desktop=Tauri 2 (Rust+iroh crate+SQLCipher/rusqlite+keyring). Web=Vite+React+Tailwind v4 (iroh-js WASM in Worker, wa-sqlite+OPFS+AES-GCM). Mobile=Expo+RN+NativeWind (iroh-ffi Expo Module, op-sqlite+SQLCipher). Core=`packages/core` pure TS, adapter ifaces. Bun workspaces monorepo; Bun=pkg mgr+runner+test runner. Node only via Metro.
 
 ## Layout
 
 ```
 apps/{web,desktop,mobile}    deployable apps
-packages/{core,ui}           shared libs (core=pure TS, ui=Tamagui)
+packages/{core,ui}           shared libs (core=pure TS, ui=React+Tailwind)
 infra/docker/                web dev container
 tooling/{typescript,eslint}  shared configs
 docs/                        long-form docs (ARCHITECTURE.md)
@@ -27,10 +27,11 @@ Top-level entry = `Makefile`. `make help` lists targets.
 - At-rest data encrypted. Key in platform secret store (Keychain/Cred Mgr/Secret Svc/Android Keystore) or non-extractable WebCrypto. Never read/export raw key.
 - Pairing tickets single-use, 60s expiry. Post-pair auth = signature.
 - Tauri allowlist: only `iroh_*`, `storage_*`, `dialog`. No `shell`/`http`/broad `fs`.
-- Web CSP strict: no `unsafe-inline`, no remote scripts, `wasm-unsafe-eval` only for iroh+Automerge+SQLite WASM.
+- Web CSP strict: no `unsafe-inline`, no remote scripts, `wasm-unsafe-eval` only for iroh+Automerge+SQLite WASM. Styling = Tailwind v4 classes (build-time CSS, self-origin). No inline `style={}` attrs (CSP `style-src 'self'` blocks). No `@font-face` remote URL.
 - No WebTransport (Safari) → unsupported screen. No silent fallback.
 - No recovery. Lost devices = lost data. "Export backup" = user-managed encrypted Automerge snapshot. Never auto-upload.
 - Package mgr = bun only. Never npm/npx/pnpm/yarn (install/add/run/exec/create). Use `bun add`, `bun install`, `bun run`, `bunx`.
+- Dev servers (vite/tauri/expo/metro) MUST be stopped before session end. Kill background tasks via TaskStop; verify ports free (`lsof -ti tcp:5173|tcp:1420|tcp:8081`). Never leave a server running.
 
 ## Skills (load on demand)
 
@@ -38,6 +39,7 @@ Top-level entry = `Makefile`. `make help` lists targets.
 - `todo-architecture` — UI split, adapters, pairing, runtime adapter pick
 - `todo-conventions` — core purity, error surfacing, migrations, screen placement, config locations
 - `todo-security` — full security/privacy rationale + edge cases
+- `todo-design` — Apple Principal Designer persona + Liquid Glass aesthetic; design tokens, components, screens, audit
 
 ## Self-maintenance (append-on-learn)
 

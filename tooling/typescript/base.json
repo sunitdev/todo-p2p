@@ -16,11 +16,7 @@
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
     "allowSyntheticDefaultImports": true,
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
-    "composite": true,
     "allowImportingTsExtensions": true,
-    "emitDeclarationOnly": true
+    "noEmit": true
   }
 }

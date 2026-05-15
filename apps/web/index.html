@@ -2,13 +2,17 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <!-- DEV CSP. Production build must drop ws/http localhost; add iroh DERP origins later. -->
+    <!--
+      Production CSP. Vite dev server rewrites this at request time to add
+      ws://localhost:<port> / http://localhost:<port> to connect-src — see
+      vite.config.ts. Never edit this for dev; never ship localhost origins.
+    -->
     <meta http-equiv="Content-Security-Policy"
       content="default-src 'self';
                script-src 'self' 'wasm-unsafe-eval';
                style-src 'self';
                img-src 'self' data:;
-               connect-src 'self' ws://localhost:5173 http://localhost:5173;
+               connect-src 'self';
                worker-src 'self' blob:;
                object-src 'none';
                base-uri 'self';

@@ -1,5 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import '@todo-p2p/ui/styles.css';
 import { App } from './App';
 
 const root = document.getElementById('root');

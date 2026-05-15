@@ -2,6 +2,8 @@
 name = "todo-p2p-desktop"
 version = "0.0.0"
 edition = "2021"
+publish = false
+rust-version = "1.77"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -12,7 +14,9 @@ tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
-# TODO: add when implementing native sync/storage
-# iroh = "..."
-# rusqlite = { version = "...", features = ["bundled-sqlcipher"] }
-# keyring = "..."
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true
