@@ -47,4 +47,89 @@ describe("TodoStore", () => {
     expect(a.applyChange(change)).toBe(true);
     expect(a.get("x")?.title).toBe("remote");
   });
+
+  test("areas: add/update/remove", () => {
+    const s = TodoStore.create();
+    s.addArea({ id: "work", name: "Work", color: "tint" });
+    expect(s.listAreas().map((a) => a.name)).toEqual(["Work"]);
+
+    s.updateArea("work", { name: "Day Job", color: "indigo" });
+    expect(s.getArea("work")?.name).toBe("Day Job");
+    expect(s.getArea("work")?.color).toBe("indigo");
+
+    s.addProject({
+      id: "p1",
+      title: "Q3 launch",
+      icon: { kind: "lucide", name: "Rocket" },
+      color: "purple",
+      areaId: "work",
+    });
+    s.removeArea("work");
+    expect(s.getArea("work")).toBeUndefined();
+    expect(s.getProject("p1")?.areaId).toBeNull();
+  });
+
+  test("projects: add/update/remove + standalone", () => {
+    const s = TodoStore.create();
+    s.addProject({
+      id: "p1",
+      title: "Side quest",
+      icon: { kind: "emoji", value: "🚀" },
+      color: "orange",
+    });
+    expect(s.listProjects()).toHaveLength(1);
+    expect(s.getProject("p1")?.areaId).toBeNull();
+
+    s.updateProject("p1", { title: "Renamed", color: "green" });
+    expect(s.getProject("p1")?.title).toBe("Renamed");
+    expect(s.getProject("p1")?.color).toBe("green");
+
+    s.removeProject("p1");
+    expect(s.getProject("p1")).toBeUndefined();
+  });
+
+  test("updateTodo patches mutable fields, leaves others untouched", () => {
+    const s = TodoStore.create();
+    s.add({ id: "a", title: "Read book" });
+    s.updateTodo("a", {
+      title: "Read A Pattern Language",
+      notes: "ch. 4",
+      flagged: true,
+      dueDate: 1715817600000,
+      scheduledWhen: "today",
+      tags: ["Reading"],
+    });
+    const t = s.get("a");
+    expect(t?.title).toBe("Read A Pattern Language");
+    expect(t?.notes).toBe("ch. 4");
+    expect(t?.flagged).toBe(true);
+    expect(t?.dueDate).toBe(1715817600000);
+    expect(t?.scheduledWhen).toBe("today");
+    expect(t?.tags).toEqual(["Reading"]);
+    expect(t?.done).toBe(false);
+  });
+
+  test("updateTodo clears notes when patch is empty string", () => {
+    const s = TodoStore.create();
+    s.add({ id: "a", title: "x", notes: "seed" });
+    s.updateTodo("a", { notes: "" });
+    expect(s.get("a")?.notes).toBeUndefined();
+  });
+
+  test("save + load preserves areas and projects", () => {
+    const s = TodoStore.create();
+    s.addArea({ id: "a1", name: "Home", color: "teal" });
+    s.addProject({
+      id: "p1",
+      title: "Kitchen reno",
+      description: "phase 1",
+      icon: { kind: "lucide", name: "Hammer" },
+      color: "teal",
+      areaId: "a1",
+    });
+    const reloaded = TodoStore.load(s.save());
+    expect(reloaded.getArea("a1")?.name).toBe("Home");
+    expect(reloaded.getProject("p1")?.title).toBe("Kitchen reno");
+    expect(reloaded.getProject("p1")?.description).toBe("phase 1");
+  });
 });

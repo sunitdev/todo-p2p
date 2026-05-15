@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help install web web-down mac mac-deps lint typecheck test build clean hooks-install hooks-run
+.PHONY: help install web web-down mac mac-deps lint typecheck test test-e2e build clean hooks-install hooks-run
 
 COMPOSE := docker compose -f infra/docker/docker-compose.yml
 
@@ -39,8 +39,11 @@ lint: ## Lint all TS/TSX
 typecheck: ## Typecheck workspace
 	bun run typecheck
 
-test: ## Run package tests
+test: ## Run unit tests across all workspaces
 	bun run test
+
+test-e2e: ## Run end-to-end Playwright tests (Chromium + WebKit)
+	bun run test:e2e
 
 build: ## Production build (web bundle only; desktop via 'tauri build')
 	bun --filter @todo-p2p/web build

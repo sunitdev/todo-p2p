@@ -1,194 +1,157 @@
 # Tokens
 
-All values exact. Drop into Tailwind v4 `@theme` block (see `tailwind-bootstrap.md`).
+All values exact. Drop into Tailwind v4 `@theme` block in `packages/ui/src/styles.css`.
 
 ## Color — semantic labels
 
 | Token | Light | Dark |
 |-------|-------|------|
-| label | #000000 | #FFFFFF |
-| secondaryLabel | #3C3C43 99% | #EBEBF5 99% |
-| tertiaryLabel | #3C3C43 4D | #EBEBF5 4D |
-| quaternaryLabel | #3C3C43 2E | #EBEBF5 2E |
-| separator | #3C3C43 49 | #54545899 |
-
-Hex with alpha shown as `RRGGBB AA` (alpha hex).
+| label | #1D1D1F | #F2F2F2 |
+| label-secondary | #6E6E73 | #A1A1A6 |
+| label-tertiary | #A1A1A6 | #6E6E73 |
+| label-quaternary | #C7C7CC | #48484A |
+| separator | #0000001A | #FFFFFF14 |
 
 ## Color — backgrounds (layered)
 
+| Token | Light | Dark | Use |
+|-------|-------|------|-----|
+| bg-l1 | #F5F5F4 | #2C2C2E | sidebar, modal, footer chrome |
+| bg-l2 | #FAFAFA | #1C1C1E | main content pane |
+| bg-l3 | #E8E8E6 | #3A3A3C | row hover, subtle inset |
+
+## Color — selection + tint
+
 | Token | Light | Dark |
 |-------|-------|------|
-| systemBackgroundL1 | #FFFFFF | #000000 |
-| systemBackgroundL2 | #F2F2F7 | #1C1C1E |
-| systemBackgroundL3 | #FFFFFF | #2C2C2E |
+| tint | #007AFF | #0A84FF |
+| row-selected | #007AFF | #0A84FF |
 
-## Color — tint + semantic
+`row-selected` is its own var so the selection fill can drift from `tint` later (Things3 historically uses a near-tint that picks up Mac accent color).
 
-| Token | Light | Dark |
-|-------|-------|------|
-| tint (systemBlue) | #007AFF | #0A84FF |
-| red | #FF3B30 | #FF453A |
-| orange | #FF9500 | #FF9F0A |
-| yellow | #FFCC00 | #FFD60A |
-| green | #34C759 | #30D158 |
+## Color — semantic (sidebar + flag)
 
-## Glass materials
+| Token | Light | Dark | Used by |
+|-------|-------|------|---------|
+| blue | #3478F6 | #3478F6 | Inbox |
+| yellow | #F5C518 | #F5C518 | Today |
+| red | #E03E3E | #E03E3E | Upcoming, due-date |
+| teal | #3CB6B0 | #3CB6B0 | Anytime |
+| tan | #C7A06A | #C7A06A | Someday |
+| green | #3FA34D | #3FA34D | Logbook |
+| orange | #FF9F0A | #FF9F0A | Flag |
+| indigo / purple / pink / gray | — | — | project/area palette |
 
-| Material | Blur(px) | Saturation | Tint light (rgba) | Tint dark (rgba) |
-|----------|----------|------------|-------------------|------------------|
-| ultraThin | 20 | 1.8 | rgba(255,255,255,0.45) | rgba(28,28,30,0.35) |
-| thin | 30 | 1.8 | rgba(255,255,255,0.60) | rgba(28,28,30,0.50) |
-| regular | 40 | 1.8 | rgba(255,255,255,0.72) | rgba(28,28,30,0.64) |
-| thick | 50 | 1.8 | rgba(255,255,255,0.82) | rgba(28,28,30,0.76) |
-| chrome | 60 | 2.0 | rgba(248,248,250,0.90) | rgba(36,36,38,0.86) |
+No decorative hex anywhere. Pick a semantic var or extend this table.
 
-## Type ramp (SF Pro)
+## Type ramp (SF Pro, tight)
 
-| Style | Size/Line | Weight |
-|-------|-----------|--------|
-| largeTitle | 34/41 | regular |
-| title1 | 28/34 | regular |
-| title2 | 22/28 | regular |
-| title3 | 20/25 | regular |
-| headline | 17/22 | semibold |
-| body | 17/22 | regular |
-| callout | 16/21 | regular |
-| subhead | 15/20 | regular |
-| footnote | 13/18 | regular |
-| caption1 | 12/16 | regular |
-| caption2 | 11/13 | regular |
+| Style | Size / Line | Weight | Use |
+|-------|-------------|--------|-----|
+| title | 22 / 26 | bold | page heading (Today, Inbox, project name) |
+| headline | 15 / 20 | bold | group headings ("This Morning") |
+| callout | 14 / 18 | regular | sidebar rows, secondary action buttons |
+| body | 13 / 17 | regular | todo title default |
+| footnote | 12 / 16 | regular | notes preview, count badges, helper labels |
+| caption | 11 / 14 | regular | tags, due-date inline text |
 
-## Space scale (8pt grid)
+Drop everything else (`title1/2/3`, `largetitle`, `subhead`). The Things3 ramp is six steps, not ten.
 
-`4, 8, 12, 16, 20, 24, 32, 44, 64`. 44 = HIG min touch.
+## Space scale (4pt grid)
+
+`--spacing: 4px` base. Standard step set: `4, 6, 8, 10, 12, 16, 20, 24, 32`. Rows are 28px (`h-7`). Sidebar gutter is 8px (`px-2`). Main pane gutter is 32px (`px-8`).
 
 ## Radius scale
 
-`4, 8, 12, 16, 22`. 22 = continuous corner (iOS app icon style).
+`4, 8, 12, 16, 22`. Default for hover/select pills = `rounded-2` (8). Modals = `rounded-4` (16). Avoid `rounded-5` — Things3 never uses pill-rounded cards.
 
 ## Shadow
 
-| Token | Offset | Blur | Spread | Color |
-|-------|--------|------|--------|-------|
-| ambient | 0,1 | 2 | 0 | rgba(0,0,0,0.06) |
-| key | 0,8 | 24 | -4 | rgba(0,0,0,0.12) |
-| glow | 0,0 | 32 | 0 | rgba(10,132,255,0.35) |
+| Token | Offset | Blur | Color (light) | Color (dark) |
+|-------|--------|------|---------------|--------------|
+| ambient | 0,1 | 2 | rgba(0,0,0,0.06) | rgba(0,0,0,0.4) |
 
-## Motion springs
+Single shadow. No `key`, no `glow`. Things3 uses one subtle drop and 1px separators for hierarchy.
 
-| Spring | Stiffness | Damping |
-|--------|-----------|---------|
-| snappy | 0.3 | 0.85 |
-| smooth | 0.5 | 0.90 |
-| bouncy | 0.4 | 0.60 |
+## Motion
+
+Single curve: ease-out, 150ms. Tailwind `transition-colors` is enough for hover. Never spring. Respect `prefers-reduced-motion`.
 
 ## Tailwind v4 `@theme` skeleton
 
-Tokens live as CSS custom properties in `packages/ui/src/styles.css`. Dark variants flip via `prefers-color-scheme: dark` (and optional `.dark` class) overriding the same vars.
+Tokens live as CSS custom properties in `packages/ui/src/styles.css`. Dark variants flip via `prefers-color-scheme: dark`.
 
 ```css
 @import "tailwindcss";
 
 @theme {
-  /* color — labels */
-  --color-label: #000000;
-  --color-label-secondary: #3C3C43F2;
-  --color-label-tertiary: #3C3C434D;
-  --color-label-quaternary: #3C3C432E;
-  --color-separator: #3C3C4349;
+  --color-label: #1D1D1F;
+  --color-label-secondary: #6E6E73;
+  --color-label-tertiary: #A1A1A6;
+  --color-label-quaternary: #C7C7CC;
+  --color-separator: #0000001A;
 
-  /* color — backgrounds */
-  --color-bg-l1: #FFFFFF;
-  --color-bg-l2: #F2F2F7;
-  --color-bg-l3: #FFFFFF;
+  --color-bg-l1: #F5F5F4;
+  --color-bg-l2: #FAFAFA;
+  --color-bg-l3: #E8E8E6;
 
-  /* color — tint + semantic */
+  --color-row-selected: #007AFF;
+
   --color-tint: #007AFF;
-  --color-red: #FF3B30;
-  --color-orange: #FF9500;
-  --color-yellow: #FFCC00;
-  --color-green: #34C759;
+  --color-blue: #3478F6;
+  --color-red: #E03E3E;
+  --color-orange: #FF9F0A;
+  --color-yellow: #F5C518;
+  --color-green: #3FA34D;
+  --color-teal: #3CB6B0;
+  --color-indigo: #5856D6;
+  --color-purple: #AF52DE;
+  --color-pink: #FF2D55;
+  --color-tan: #C7A06A;
+  --color-gray: #8E8E93;
 
-  /* spacing — 8pt grid */
-  --spacing-1: 4px;
-  --spacing-2: 8px;
-  --spacing-3: 12px;
-  --spacing-4: 16px;
-  --spacing-5: 20px;
-  --spacing-6: 24px;
-  --spacing-7: 32px;
-  --spacing-8: 44px;
-  --spacing-9: 64px;
+  --spacing: 4px;
 
-  /* radius */
   --radius-1: 4px;
   --radius-2: 8px;
   --radius-3: 12px;
   --radius-4: 16px;
   --radius-5: 22px;
 
-  /* font */
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
 
-  /* type ramp (Apple) — font-size paired with line-height */
-  --text-caption2: 11px; --text-caption2--line-height: 13px;
-  --text-caption1: 12px; --text-caption1--line-height: 16px;
-  --text-footnote: 13px; --text-footnote--line-height: 18px;
-  --text-subhead: 15px;  --text-subhead--line-height: 20px;
-  --text-callout: 16px;  --text-callout--line-height: 21px;
-  --text-body: 17px;     --text-body--line-height: 22px;
-  --text-headline: 17px; --text-headline--line-height: 22px;
-  --text-title3: 20px;   --text-title3--line-height: 25px;
-  --text-title2: 22px;   --text-title2--line-height: 28px;
-  --text-title1: 28px;   --text-title1--line-height: 34px;
-  --text-largetitle: 34px; --text-largetitle--line-height: 41px;
+  --text-caption: 11px;  --text-caption--line-height: 14px;
+  --text-footnote: 12px; --text-footnote--line-height: 16px;
+  --text-body: 13px;     --text-body--line-height: 17px;
+  --text-callout: 14px;  --text-callout--line-height: 18px;
+  --text-headline: 15px; --text-headline--line-height: 20px;
+  --text-title: 22px;    --text-title--line-height: 26px;
 
-  /* shadows */
   --shadow-ambient: 0 1px 2px 0 rgba(0,0,0,0.06);
-  --shadow-key: 0 8px 24px -4px rgba(0,0,0,0.12);
-  --shadow-glow: 0 0 32px 0 rgba(10,132,255,0.35);
-
-  /* glass blur sizes */
-  --blur-ultra-thin: 20px;
-  --blur-thin: 30px;
-  --blur-regular: 40px;
-  --blur-thick: 50px;
-  --blur-chrome: 60px;
 }
 
 @media (prefers-color-scheme: dark) {
   @theme {
-    --color-label: #FFFFFF;
-    --color-label-secondary: #EBEBF5F2;
-    --color-label-tertiary: #EBEBF54D;
-    --color-label-quaternary: #EBEBF52E;
-    --color-separator: #54545899;
-    --color-bg-l1: #000000;
+    --color-label: #F2F2F2;
+    --color-label-secondary: #A1A1A6;
+    --color-label-tertiary: #6E6E73;
+    --color-label-quaternary: #48484A;
+    --color-separator: #FFFFFF14;
+    --color-bg-l1: #2C2C2E;
     --color-bg-l2: #1C1C1E;
-    --color-bg-l3: #2C2C2E;
+    --color-bg-l3: #3A3A3C;
+    --color-row-selected: #0A84FF;
     --color-tint: #0A84FF;
-    --color-red: #FF453A;
-    --color-orange: #FF9F0A;
-    --color-yellow: #FFD60A;
-    --color-green: #30D158;
+    --shadow-ambient: 0 1px 2px 0 rgba(0,0,0,0.4);
   }
 }
 
-/* glass materials — repeatable atoms */
 @layer components {
-  .glass-ultra-thin { @apply backdrop-blur-[20px] backdrop-saturate-[1.8] bg-white/45 dark:bg-[#1C1C1E]/35; }
-  .glass-thin       { @apply backdrop-blur-[30px] backdrop-saturate-[1.8] bg-white/60 dark:bg-[#1C1C1E]/50; }
-  .glass-regular    { @apply backdrop-blur-[40px] backdrop-saturate-[1.8] bg-white/72 dark:bg-[#1C1C1E]/64; }
-  .glass-thick      { @apply backdrop-blur-[50px] backdrop-saturate-[1.8] bg-white/82 dark:bg-[#1C1C1E]/76; }
-  .glass-chrome     { @apply backdrop-blur-[60px] backdrop-saturate-[2.0] bg-[#F8F8FA]/90 dark:bg-[#242426]/86; }
+  .row-hover { @apply hover:bg-bg-l3; }
+  .row-selected { @apply bg-[var(--color-row-selected)] text-white; }
+  .section-header { @apply text-caption font-semibold uppercase tracking-wider text-label-tertiary; }
 }
 ```
 
-Springs handled in motion lib (Framer Motion / RN Reanimated) — not Tailwind.
-
-| Spring | Stiffness | Damping |
-|--------|-----------|---------|
-| snappy | 300 | 25 |
-| smooth | 200 | 28 |
-| bouncy | 250 | 14 |
+No glass-material classes. No blur tokens. No spring tables.

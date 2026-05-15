@@ -1,139 +1,218 @@
 # Components
 
-Each: intent → props → Tailwind snippet → Do/Don't. All shared components live in `packages/ui/src/components/`.
+Each: intent → props → Tailwind snippet → Do/Don't. All shared components live in `packages/ui/src/components/`. Surfaces are flat — no glass, no blur.
 
 ## Button
 
-Intent: primary action surface. 4 Apple variants.
+Intent: primary action. Three Things3-flavored variants.
 
 | Prop | Type | Default |
 |------|------|---------|
-| variant | `'filled' \| 'tinted' \| 'plain' \| 'destructive'` | `filled` |
-| size | `'sm' \| 'md' \| 'lg'` | `md` |
+| variant | `'pill' \| 'icon' \| 'plain'` | `pill` |
+| size | `'sm' \| 'md'` | `sm` |
 | icon | `LucideIcon` | — |
-| loading | `boolean` | `false` |
 | disabled | `boolean` | `false` |
 
 ```tsx
-<button className={cn(
-  'inline-flex items-center justify-center gap-2 rounded-3 px-4 min-h-[44px]',
-  'text-headline font-semibold transition-transform active:scale-[0.98]',
-  variant === 'filled'       && 'bg-tint text-white',
-  variant === 'tinted'       && 'bg-tint/15 text-tint',
-  variant === 'plain'        && 'bg-transparent text-tint',
-  variant === 'destructive'  && 'bg-red text-white',
-)}>{children}</button>
+// pill — used for "New List" w/ trailing label
+<button className="inline-flex h-7 items-center gap-1.5 rounded-2 px-2 text-footnote font-medium text-label-secondary hover:bg-bg-l3 hover:text-label">
+  <span className="inline-flex size-4 items-center justify-center rounded-full bg-tint text-white">
+    <Plus className="size-2.5" />
+  </span>
+  <span>New List</span>
+</button>
+
+// icon — toolbar button, 32px round
+<button className="inline-flex size-8 items-center justify-center rounded-full text-label-secondary hover:bg-bg-l3 hover:text-label">
+  <Calendar className="size-4" />
+</button>
+
+// plain — destructive in modals
+<button className="text-callout text-red hover:underline">Delete</button>
 ```
 
-- Do: `min-h-[44px]`. Spring on press via Framer Motion or CSS scale transition.
-- Don't: stack 3+ filled buttons in row. One filled max.
+- Do: 28-32px touch target. Single-fill blue only for the "new" affordance.
+- Don't: gradient/shadow buttons. Don't stack pills horizontally.
 
 ## ListRow
 
-Intent: scannable row. Leading icon + title + subtitle + trailing (chevron | toggle | value).
+Intent: scannable row. Compact, ~28px tall, no chevron.
 
 | Prop | Type |
 |------|------|
 | leading | `LucideIcon \| ReactNode` |
 | title | `string` |
-| subtitle | `string` |
-| trailing | `'chevron' \| 'toggle' \| ReactNode` |
-| onPress | `() => void` |
+| trailing | `ReactNode` (count badge, optional) |
+| active | `boolean` |
+| onClick | `() => void` |
 
 ```tsx
-<button className="flex items-center w-full gap-3 px-4 min-h-[44px] text-left">
-  <Icon className="size-5 text-label-secondary" />
-  <span className="flex-1 text-body text-label">{title}</span>
-  <ChevronRight className="size-4 text-label-tertiary" />
+<button
+  onClick={onClick}
+  className={cn(
+    'group flex h-7 items-center gap-2.5 rounded-2 px-2 text-callout transition-colors',
+    active ? 'row-selected' : 'text-label hover:bg-bg-l3',
+  )}
+>
+  <Icon className={cn('size-4 shrink-0', active ? 'text-white' : iconTint)} />
+  <span className="flex-1 text-left">{title}</span>
+  {count > 0 && (
+    <span className={cn('text-footnote tabular-nums', active ? 'text-white/80' : 'text-label-tertiary')}>
+      {count}
+    </span>
+  )}
 </button>
 ```
 
-- Do: `min-h-[44px]`. Separator inset matches leading icon edge.
-- Don't: more than 2 trailing elements.
+- Do: 14px text, 16px icon, 10px gap, `row-selected` for active state.
+- Don't: chevrons. Don't add a left accent bar — selection is the row fill.
 
-## Sheet
+## TodoRow
 
-Intent: contextual layer. Three modes: sheet (bottom), popover (anchored), alert (centered destructive). Use `<dialog>` element or Radix Dialog primitive.
+Intent: a single to-do. The dense canonical row.
 
 ```tsx
-<dialog className="glass-thick rounded-t-5 p-6 backdrop:bg-black/30">{children}</dialog>
+<li className="group flex items-center gap-2 rounded-1 px-1 py-1 hover:bg-bg-l3">
+  <button
+    role="checkbox"
+    aria-checked={done}
+    className={cn(
+      'inline-flex size-[14px] shrink-0 items-center justify-center rounded-[3px] border transition-colors',
+      done ? 'border-tint bg-tint text-white' : 'border-label-tertiary group-hover:border-label-secondary',
+    )}
+  >
+    {done && <CheckGlyph />}
+  </button>
+  <div className="flex min-w-0 flex-1 flex-col">
+    <span className={cn('text-body truncate', done && 'text-label-tertiary line-through')}>{title}</span>
+    {notes && <p className="truncate text-footnote text-label-secondary">{notes}</p>}
+  </div>
+  {hasNotes && <FileText className="size-3 text-label-tertiary" />}
+</li>
 ```
 
-- Do: chrome material for nav, thick for modal, regular for picker.
-- Don't: nest sheets. Use alert for confirm only.
+- Do: 14px square checkbox w/ 1px border + 3px radius. Body 13px regular weight.
+- Don't: large circular checkboxes (that's iOS Reminders). Don't background-fill due-date pills — plain colored text only.
 
-## NavBar
+## Sheet / Modal
 
-Intent: title + nav actions. Large-title collapses to inline on scroll.
+Intent: contextual layer for forms.
 
 ```tsx
-<header className="sticky top-0 glass-chrome border-b border-separator px-4 py-3">
-  <h1 className="text-largetitle">{title}</h1>
+<div className="fixed inset-0 z-40 flex items-center justify-center bg-label/30">
+  <div className="w-[480px] max-w-[92vw] rounded-4 border border-separator bg-bg-l1 shadow-ambient">
+    {children}
+  </div>
+</div>
+```
+
+- Do: flat `bg-bg-l1`, 1px separator border, single ambient shadow.
+- Don't: backdrop-blur, glass, multiple shadow layers.
+
+## NavBar / Page header
+
+Intent: title + leading colored icon. No collapse, no chrome.
+
+```tsx
+<header className="px-8 pt-8 pb-3">
+  <div className="flex items-center gap-2.5">
+    <Icon className={cn('size-6', tint)} />
+    <h1 className="text-title font-bold tracking-tight text-label">{title}</h1>
+  </div>
 </header>
 ```
 
-- Do: collapse threshold 40pt scroll. `glass-chrome` on collapse.
-- Don't: ship large-title on modal/sheet screens.
+- Do: title 22/26 bold, icon 24px in semantic tint.
+- Don't: large-title scroll-collapse (Reminders pattern, not Things3). Don't add right-side action buttons — actions live in the bottom toolbar.
+
+## Footer toolbar
+
+Intent: bottom action strip. Four icons.
+
+```tsx
+<footer className="border-t border-separator bg-bg-l1 px-8 py-2">
+  <div className="mx-auto flex max-w-3xl items-center justify-between">
+    <button aria-label="New To-Do" className="inline-flex size-8 items-center justify-center rounded-full bg-tint text-white">
+      <Plus className="size-4" />
+    </button>
+    <div className="flex items-center gap-1">
+      <ToolbarBtn icon={Calendar} label="Schedule" />
+      <ToolbarBtn icon={ArrowRight} label="Move" />
+      <ToolbarBtn icon={Search} label="Search" />
+    </div>
+  </div>
+</footer>
+```
+
+- Do: leading 32px round filled-blue `+`. Trailing icons 32px round, secondary-label color.
+- Don't: text labels on icons. Don't pad the footer past `py-2` — Things3 footer is tight.
 
 ## TextField
-
-Intent: text input. States: idle / focus / error / disabled.
 
 ```tsx
 <label className="flex flex-col gap-1">
   <span className="text-footnote text-label-secondary">{label}</span>
   <input className={cn(
-    'h-11 px-3 rounded-2 bg-bg-l3 text-body text-label',
-    'focus:outline-none focus:ring-2 focus:ring-tint/40',
-    error && 'ring-2 ring-red/60'
+    'h-8 px-2 rounded-2 bg-bg-l3 text-body text-label',
+    'focus:outline-none focus:ring-1 focus:ring-tint',
+    error && 'ring-1 ring-red'
   )} />
 </label>
 ```
 
-- Do: error replaces helper, tint=red. Focus ring = tint glow.
-- Don't: placeholder as label. Label always visible.
+- Do: 32px tall, `bg-bg-l3` inset, 1px focus ring.
+- Don't: glassy backgrounds. Don't use placeholder as label.
 
 ## Toggle
 
-Intent: binary state. Spring animated thumb.
-
 ```tsx
 <button role="switch" aria-checked={value} className={cn(
-  'relative h-[31px] w-[51px] rounded-full transition-colors',
+  'relative h-[20px] w-[34px] rounded-full transition-colors',
   value ? 'bg-green' : 'bg-label-quaternary'
 )}>
   <span className={cn(
-    'absolute top-[2px] size-[27px] rounded-full bg-white shadow-ambient transition-transform',
-    value ? 'translate-x-[22px]' : 'translate-x-[2px]'
+    'absolute top-[2px] size-[16px] rounded-full bg-white shadow-ambient transition-transform',
+    value ? 'translate-x-[16px]' : 'translate-x-[2px]'
   )} />
 </button>
 ```
 
-- Do: snappy spring. Haptic on RN.
-- Don't: use for nav.
+- Do: macOS-sized, green when on.
+- Don't: use for navigation.
 
-## Toast
-
-Intent: inline non-blocking banner.
+## ContextMenu
 
 ```tsx
-<div role="status" className="glass-regular rounded-3 px-4 py-3 shadow-key text-body">
-  {message}
+<div role="menu" className="fixed z-50 min-w-[180px] rounded-2 border border-separator bg-bg-l1 shadow-ambient py-1">
+  {items.map((it) => (
+    <button className="flex w-full items-center gap-2 px-3 py-1.5 text-callout text-left hover:bg-bg-l3">
+      {it.icon}
+      <span>{it.label}</span>
+    </button>
+  ))}
 </div>
 ```
 
-- Do: top-anchored on web/desktop, bottom on mobile. Spring in/out.
-- Don't: use toast for required action.
+- Do: flat `bg-bg-l1` w/ separator border. Destructive items get `text-red`.
+- Don't: blur, drop-shadow stacks, glass.
 
-## Surface
+## Section header (sidebar / settings)
 
-Intent: glass primitive. Wrap content needing material.
+Repeatable atom defined in `styles.css`:
 
-```tsx
-<div className="glass-regular rounded-3 shadow-ambient p-4">{children}</div>
+```css
+.section-header { @apply text-caption font-semibold uppercase tracking-wider text-label-tertiary; }
 ```
 
-Material classes: `.glass-ultra-thin`, `.glass-thin`, `.glass-regular`, `.glass-thick`, `.glass-chrome` (defined in `styles.css` `@layer components`).
+Use as a `<div className="section-header ...">` for "PROJECTS" / "AREAS" / "DEVICE" group labels.
 
-- Do: pick by depth — UI chrome=`glass-chrome`, modal=`glass-thick`, card=`glass-regular`, hover=`glass-thin`, scrim=`glass-ultra-thin`.
-- Don't: stack 3+ glass layers. Light gets muddy.
+## Surface (flat card)
+
+Intent: generic content card.
+
+```tsx
+<div className="rounded-2 border border-separator bg-bg-l1 p-3">{children}</div>
+```
+
+- Do: pick by stack — sidebar/footer = `bg-bg-l1`; main = `bg-bg-l2`; row hover = `bg-bg-l3`.
+- Don't: stack three different background tiers in one screen. Hierarchy is two-deep max.

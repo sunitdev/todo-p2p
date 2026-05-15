@@ -10,7 +10,8 @@
     "./styles.css": "./src/styles.css"
   },
   "scripts": {
-    "typecheck": "tsc -b"
+    "typecheck": "tsc -b",
+    "test": "bun test"
   },
   "peerDependencies": {
     "react": "18.3.1"

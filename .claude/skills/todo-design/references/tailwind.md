@@ -37,6 +37,7 @@ Add `"./src/styles.css": "./src/styles.css"` to `packages/ui/package.json` `expo
 - Never use inline `style={}` attrs — browsers fall back to `style-src` and block them.
 - No `@font-face` remote URL. System fonts only via `--font-sans`.
 - Vite dev injects HMR styles via `<style>` — keep `'self'` only; Vite uses CSSOM, not inline strings, so no CSP relaxation needed.
+- Things3 design has no `backdrop-filter` / blur — so the `wasm-unsafe-eval` CSP exception remains the only relaxation, and `style-src` stays strict `'self'`.
 
 ## Utility helper
 

@@ -1,81 +1,8 @@
 import { beforeEach, describe, expect, test } from "bun:test";
-import type {
-  PairingTicket,
-  PeerConnection,
-  PeerStatusEvent,
-  StorageAdapter,
-  TransportAdapter,
-  TrustedPeer,
-  Unsubscribe,
-} from "../src/adapters/index.ts";
 import { SyncEngine } from "../src/syncEngine.ts";
 import { TodoStore } from "../src/todoStore.ts";
-
-class MemStorage implements StorageAdapter {
-  doc: Uint8Array | null = null;
-  changes: Uint8Array[] = [];
-  peers = new Map<string, TrustedPeer>();
-
-  async loadDoc() {
-    return this.doc;
-  }
-  async saveDoc(b: Uint8Array) {
-    this.doc = b;
-  }
-  async appendChange(c: Uint8Array) {
-    this.changes.push(c);
-  }
-  async loadChanges() {
-    return [...this.changes];
-  }
-  async truncateChanges() {
-    this.changes = [];
-  }
-  async loadTrustedPeers() {
-    return [...this.peers.values()];
-  }
-  async saveTrustedPeer(p: TrustedPeer) {
-    this.peers.set(p.nodeId, p);
-  }
-  async removeTrustedPeer(id: string) {
-    this.peers.delete(id);
-  }
-}
-
-type MessageHandler = (peerId: string, payload: Uint8Array) => void;
-
-class MemTransport implements TransportAdapter {
-  private handlers = new Set<MessageHandler>();
-  async start() {
-    return "node-mock";
-  }
-  async stop() {}
-  async mintPairingTicket(ttl: number): Promise<PairingTicket> {
-    return {
-      ticket: "t",
-      nodeId: "node-mock",
-      pskHash: new Uint8Array(),
-      expiresAt: Date.now() + ttl * 1000,
-    };
-  }
-  async dialWithTicket(): Promise<PeerConnection> {
-    throw new Error("not used");
-  }
-  async dialTrusted(): Promise<PeerConnection> {
-    throw new Error("not used");
-  }
-  onMessage(h: MessageHandler): Unsubscribe {
-    this.handlers.add(h);
-    return () => this.handlers.delete(h);
-  }
-  onPeerStatus(_: (e: PeerStatusEvent) => void): Unsubscribe {
-    return () => {};
-  }
-  /** Test helper: simulate a message arriving from `peerId`. */
-  inject(peerId: string, payload: Uint8Array) {
-    for (const h of this.handlers) h(peerId, payload);
-  }
-}
+import { MemStorage } from "./helpers/MemStorage.ts";
+import { MemTransport } from "./helpers/MemTransport.ts";
 
 describe("SyncEngine", () => {
   let storage: MemStorage;
@@ -102,7 +29,6 @@ describe("SyncEngine", () => {
   });
 
   test("incoming message merges into local store", async () => {
-    // Remote derived from local snapshot — mirrors what initial pairing transfer does.
     const remoteStore = TodoStore.load(engine.todos().save());
     const change = remoteStore.add({ id: "r", title: "from peer" });
     const events: string[] = [];
@@ -123,7 +49,7 @@ describe("SyncEngine", () => {
 
   test("two diverged engines converge after exchanging changes", async () => {
     const storageB = new MemStorage();
-    storageB.doc = engine.todos().save(); // pair B from A's snapshot
+    storageB.doc = engine.todos().save();
     const transportB = new MemTransport();
     const engineB = await SyncEngine.open(storageB, transportB);
 

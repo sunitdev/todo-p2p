@@ -10,4 +10,4 @@ COPY apps/web/package.json ./apps/web/
 RUN bun install --frozen-lockfile || bun install
 
 EXPOSE 5173
-CMD ["bun", "--filter", "@todo-p2p/web", "dev", "--", "--host", "0.0.0.0"]
+CMD ["bun", "--filter", "@todo-p2p/web", "dev"]

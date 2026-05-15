@@ -32,6 +32,7 @@ Top-level entry = `Makefile`. `make help` lists targets.
 - No recovery. Lost devices = lost data. "Export backup" = user-managed encrypted Automerge snapshot. Never auto-upload.
 - Package mgr = bun only. Never npm/npx/pnpm/yarn (install/add/run/exec/create). Use `bun add`, `bun install`, `bun run`, `bunx`.
 - Dev servers (vite/tauri/expo/metro) MUST be stopped before session end. Kill background tasks via TaskStop; verify ports free (`lsof -ti tcp:5173|tcp:1420|tcp:8081`). Never leave a server running.
+- Every new feature / bug fix MUST land with unit + integration tests in the same PR. See `todo-testing` skill for layout + commands. Failing CI on missing coverage is by design.
 
 ## Skills (load on demand)
 
@@ -39,7 +40,8 @@ Top-level entry = `Makefile`. `make help` lists targets.
 - `todo-architecture` — UI split, adapters, pairing, runtime adapter pick
 - `todo-conventions` — core purity, error surfacing, migrations, screen placement, config locations
 - `todo-security` — full security/privacy rationale + edge cases
-- `todo-design` — Apple Principal Designer persona + Liquid Glass aesthetic; design tokens, components, screens, audit
+- `todo-design` — Things3 (Cultured Code) dark aesthetic; design tokens, components, screens, audit
+- `todo-testing` — bun test + happy-dom + Playwright conventions, mandatory unit + integration test on every feature/fix
 
 ## Self-maintenance (append-on-learn)
 
@@ -55,6 +57,7 @@ Major project fact learned → persist immediately, no ask.
 - Arch/adapter/sync/pairing → `todo-architecture`
 - Code convention → `todo-conventions`
 - Security detail/rationale → `todo-security`
+- Testing convention/pattern → `todo-testing`
 - Doesn't fit + recurring → new skill `.claude/skills/todo-<topic>/SKILL.md` + add to "Skills" list
 
 **How**: 1-line caveman entry. Edit existing, no dupes. Contradicts existing → update, don't append. Frontmatter `description` must stay accurate (loads on desc match).

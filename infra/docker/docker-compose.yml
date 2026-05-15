@@ -1,3 +1,5 @@
+name: todo-p2p
+
 services:
   web:
     build:
@@ -14,4 +16,4 @@ services:
       - /workspace/packages/ui/node_modules
     environment:
       - CHOKIDAR_USEPOLLING=true
-    command: bun --filter @todo-p2p/web dev -- --host 0.0.0.0
+    command: bun --filter @todo-p2p/web dev

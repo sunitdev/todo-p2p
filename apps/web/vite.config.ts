@@ -1,6 +1,7 @@
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
+import wasm from 'vite-plugin-wasm';
 
 const PORT = 5173;
 
@@ -24,7 +25,7 @@ function devCspPlugin(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [react(), tailwindcss(), devCspPlugin()],
+  plugins: [react(), tailwindcss(), wasm(), devCspPlugin()],
   server: {
     host: true,
     port: PORT,

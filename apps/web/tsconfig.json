@@ -2,7 +2,7 @@
   "extends": "../../tooling/typescript/base.json",
   "compilerOptions": {
     "jsx": "react-jsx",
-    "types": ["vite/client"]
+    "types": ["vite/client", "bun", "@testing-library/jest-dom"]
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*", "__tests__/**/*"]
 }

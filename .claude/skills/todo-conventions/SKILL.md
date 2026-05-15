@@ -15,6 +15,8 @@ Migrations:
 - Live in `packages/core/src/migrations/`
 - Desktop Rust keeps parallel constant
 - Build-time test keeps them in sync → never silence
+- Inside `Automerge.change`, never reassign an existing object/map prop to itself (e.g. `d.meta = d.meta ?? {...}`) — Automerge throws "Cannot create a reference to an existing document object". Use `if (!d.meta) d.meta = {...}` instead.
+- Automerge rejects `undefined` values (not a JSON type). Never spread an input object whose optional keys may be `undefined` into a doc. Build the assigned object explicitly and gate optional fields with `if (val) d.x = val`. To clear, use `delete d.x`.
 
 Screens:
 - Shared (cross-platform) → `packages/ui/screens`

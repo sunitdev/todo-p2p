@@ -1,11 +1,11 @@
 {
   "extends": "../../tooling/typescript/lib.json",
   "compilerOptions": {
-    "rootDir": "./src",
     "outDir": "./dist",
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "types": ["bun", "@testing-library/jest-dom"]
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "__tests__/**/*", "test-setup.ts"],
   "references": [
     { "path": "../core" }
   ]

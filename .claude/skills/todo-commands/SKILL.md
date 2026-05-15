@@ -29,10 +29,18 @@ Direct bun (escape hatch):
 - Core (`packages/core`):
   - `bun --filter @todo-p2p/core test` → bun test
   - `bun --filter @todo-p2p/core test syncEngine` → single file
+- UI (`packages/ui`):
+  - `bun --filter @todo-p2p/ui test` → component + hook tests (happy-dom)
+  - `bun --filter @todo-p2p/ui test Modal` → single file
+- Web (`apps/web`):
+  - `bun --filter @todo-p2p/web test` → unit tests (Splash/ErrorScreen, NullTransport)
+  - `bun --filter @todo-p2p/web test:e2e` → Playwright (auto-starts vite preview, auto-stops)
+  - `make test-e2e` → same
 - Workspace:
   - `bun typecheck` → tsc -b --noEmit
   - `bun lint` → eslint (flat config @ /eslint.config.js → tooling/eslint preset)
-  - `bun test` → all packages
+  - `bun test` → all workspaces (core + ui + web unit)
+  - `bun test:e2e` → Playwright e2e (apps/web)
 - Docker compose (compose file lives at `infra/docker/docker-compose.yml`):
   - `docker compose -f infra/docker/docker-compose.yml up --build web`
   - `docker compose -f infra/docker/docker-compose.yml down`

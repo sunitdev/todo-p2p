@@ -1,5 +1,14 @@
-export { TodoStore } from "./todoStore.ts";
-export type { Todo, TodoDoc } from "./todoStore.ts";
+export { TodoStore, PALETTE_COLORS } from "./todoStore.ts";
+export type {
+  Todo,
+  TodoDoc,
+  Area,
+  Project,
+  IconRef,
+  PaletteColor,
+  AreaInput,
+  ProjectInput,
+} from "./todoStore.ts";
 
 export { SyncEngine } from "./syncEngine.ts";
 export type { SyncEvent } from "./syncEngine.ts";

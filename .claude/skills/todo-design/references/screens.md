@@ -1,154 +1,146 @@
 # Screens
 
-Each: layout → states → Apple reference → core types bound.
+Each: layout → states → core types bound. Reference: Things3 (Cultured Code).
 
-## TodoList
-
-Apple ref: Reminders (iOS).
+## TodoList — primary screen
 
 ```
-┌─────────────────────────────┐
-│  Todos                  + │ ← NavBar large-title, chrome on scroll
-│                             │
-│  3 open                     │ ← subtitle
-├─────────────────────────────┤
-│ ○  Buy milk            ›   │ ← ListRow swipe→done/delete
-│ ○  Ship release        ›   │
-│ ●  Renew passport      ›   │
-│                             │
-│                       [ + ] │ ← floating Button filled, bottom-trailing
-└─────────────────────────────┘
+┌──────────────┬──────────────────────────────────────────┐
+│              │                                          │
+│   Inbox    0 │   ⭐ Today                               │
+│ ★ Today    5 │                                          │
+│   Upcoming   │   This Morning                           │
+│   Anytime    │   ☐  Pick up dry cleaning   Errands      │
+│   Someday    │   ☐  Reply to design review ⚑           │
+│   Logbook    │   ☐  Draft Q2 roadmap                    │
+│              │      Focus on sync reliability + UX 📄  │
+│   PROJECTS   │                                          │
+│   ○ Things   │   This Evening                           │
+│              │   ☐  30-minute walk         Health       │
+│   AREA 1     │   ☐  Read A Pattern Lang.   Reading      │
+│   ○ Proj 1   │                                          │
+│              │                                          │
+│   AREA 2     │                                          │
+│   ○ Proj 2   │                                          │
+│              │                                          │
+│ + New List ⚙ │   ⊕    📅  →  🔎                        │
+└──────────────┴──────────────────────────────────────────┘
 ```
 
-Binds: `TodoDoc.todos`, `TodoDoc.order`.
+- Sidebar (260px, `bg-bg-l1`): six fixed sections + Projects (standalone) + Areas (collapsible groups). Selected row = full-fill `row-selected`. Sidebar icon colors are semantic (Inbox=blue, Today=yellow, Upcoming=red, Anytime=teal, Someday=tan, Logbook=green).
+- Main pane (`bg-bg-l2`): 22px bolded title with leading colored section icon. Group headings ("This Morning" / "This Evening") = 15px bold. Rows = `TodoRow` (see components.md).
+- Footer (`bg-bg-l1` + top separator): leading round filled-blue `+`, trailing three icon buttons (Calendar, ArrowRight, Search). No "New To-Do" label.
+
+Binds: `TodoDoc.todos`, `TodoDoc.order`, filtered by Todo.scheduledWhen / scheduledFor / done / dueDate.
+
+Section filter rules:
+- Inbox → todos w/ no `projectId`, no `areaId`, no `scheduledWhen`, no `scheduledFor`, not done.
+- Today → `scheduledWhen === 'today'` OR `scheduledFor` on/before today.
+- Upcoming → `scheduledFor` future, not done.
+- Anytime → not scheduled, not someday, not done.
+- Someday → `scheduledWhen === 'someday'`.
+- Logbook → `done === true`.
 
 States:
-- empty → "No todos. Tap + to add." centered, secondaryLabel.
-- loading → skeleton 3 rows, shimmer with smooth spring.
-- error → Toast kind=error, list stays last-known.
-- loaded → rendered above.
+- empty → "Nothing here yet" + "Tap + to add a to-do." centered, label-secondary/tertiary.
+- loading → skeleton 3 rows (no shimmer; static `bg-bg-l3` blocks fading via opacity-pulse ease-out).
+- error → Toast at top of main pane; list stays last-known.
 
-## TodoDetail
+## TodoDetail — inline (no modal sheet)
 
-Apple ref: Reminders detail sheet.
+Things3 expands the row in place. Tapping a todo replaces its title-only display with title + notes + meta inputs, indented under the same checkbox.
 
 ```
-┌─────────────────────────────┐
-│ ╴╴╴╴ (sheet handle)         │
-│                             │
-│  Title          [        ]  │ ← TextField
-│  Notes          [        ]  │ ← TextField multiline
-│  Tags           [ work ✕ ]  │
-│                             │
-│  ─────────────              │
-│  Done           [ Toggle ]  │
-│                             │
-│  [ Delete ]      [  Save  ] │ ← destructive + filled
-└─────────────────────────────┘
+☐  Draft Q2 roadmap                                     ⚑
+   ┌─────────────────────────────────────────────────┐
+   │ Notes: Focus on sync reliability + UX polish    │
+   ├─────────────────────────────────────────────────┤
+   │ 📅 When  May 15           ⚑  Flag               │
+   │ 🏷 Tags  Work                                    │
+   │                                                  │
+   │   [ Delete ]              [ Done editing ]      │
+   └─────────────────────────────────────────────────┘
+☐  30-minute walk
 ```
 
-Binds: `Todo`.
+Binds: `Todo`. Mutations via `useStore().updateTodo(id, patch)`.
 
-Presentation: Sheet mode=sheet, detents=['md','lg'], material=thick.
-
-States:
-- empty → new todo, fields blank, Save disabled until title.
-- loading → fields disabled, smooth fade.
-- error → inline TextField error on offending field.
-- loaded → fields prefilled from `Todo`.
+States: see TodoList loading/error. No empty (only renders for an existing row).
 
 ## Pairing
 
-Apple ref: AirDrop / AppleTV pairing.
+```
+┌─────────────────────────────────────────┐
+│  Pair device                            │
+│                                         │
+│  ┌───────────────┐                      │
+│  │   ▓▓ QR ▓▓    │  display PairingPayload as QR
+│  │   ▓▓▓▓▓▓▓▓    │                      │
+│  └───────────────┘                      │
+│                                         │
+│  Expires in 00:54        countdown 60s  │
+│  Fingerprint: a3·f9·7c   match-confirm  │
+│                                         │
+│  [ Confirm match ]                      │
+│  [ Scan QR instead ]                    │
+└─────────────────────────────────────────┘
+```
 
-```
-┌─────────────────────────────┐
-│  Pair device                │
-│                             │
-│  ┌───────────────┐          │
-│  │   ▓▓ QR ▓▓    │  ← display PairingPayload as QR
-│  │   ▓▓▓▓▓▓▓▓    │
-│  └───────────────┘          │
-│                             │
-│  Expires in 00:54           │ ← 60s ticket countdown
-│                             │
-│  Fingerprint: a3·f9·7c      │ ← match-confirm
-│  [ Confirm match ]          │
-│                             │
-│  [ Scan QR instead ]        │ ← swap to scanner
-└─────────────────────────────┘
-```
+QR card = flat `bg-bg-l1` + 1px separator border, no glass. Countdown text is `text-callout text-label-secondary`; switches to `text-red` after 50s.
 
 Binds: `PairingPayload`, `PairingState`.
-
-States:
-- empty → "Generate pairing code" Button filled.
-- loading → "Generating…" spring fade.
-- error → Toast error, "Try again" Button.
-- loaded → QR + countdown + fingerprint.
-- expired (ticket 60s elapsed) → QR dimmed, "Code expired" red label, "Regenerate" Button.
 
 Critical: CLAUDE.md — tickets single-use, 60s expiry. Show countdown live.
 
 ## Settings
 
-Apple ref: iOS Settings grouped list.
+iOS-style grouped list, but on flat dark surfaces.
 
 ```
-┌─────────────────────────────┐
-│  Settings                   │
-│                             │
-│  DEVICE                     │ ← section header, footnote uppercase
-│ ┌─────────────────────────┐ │
-│ │  Name        MacBook  › │ │
-│ │  ID          a3f9··  ›  │ │
-│ └─────────────────────────┘ │
-│                             │
-│  SYNC                       │
-│ ┌─────────────────────────┐ │
-│ │  Paired devices    2  › │ │
-│ │  Pair new…            › │ │
-│ └─────────────────────────┘ │
-│                             │
-│  STORAGE                    │
-│ ┌─────────────────────────┐ │
-│ │  Export backup        › │ │
-│ │  Wipe device     [red]› │ │
-│ └─────────────────────────┘ │
-│                             │
-│  ABOUT                      │
-│ ┌─────────────────────────┐ │
-│ │  Version           1.0  │ │
-│ │  Source code          › │ │
-│ └─────────────────────────┘ │
-└─────────────────────────────┘
+┌─────────────────────────────────────────┐
+│  Settings                               │
+│                                         │
+│  DEVICE                                 │
+│  ┌──────────────────────────────────┐  │
+│  │  Name        MacBook              │  │
+│  │  ID          a3f9··               │  │
+│  └──────────────────────────────────┘  │
+│                                         │
+│  SYNC                                   │
+│  ┌──────────────────────────────────┐  │
+│  │  Paired devices       2           │  │
+│  │  Pair new…                        │  │
+│  └──────────────────────────────────┘  │
+│                                         │
+│  STORAGE                                │
+│  ┌──────────────────────────────────┐  │
+│  │  Export backup                    │  │
+│  │  Wipe device              [red]   │  │
+│  └──────────────────────────────────┘  │
+└─────────────────────────────────────────┘
 ```
 
-Binds: `DeviceIdentity` (Device section), `PairingState` (Sync section).
+Group label = `.section-header`. Each group = `Surface` (`bg-bg-l1 border border-separator rounded-2`). Rows are 32px tall (`h-8`), 14px text.
 
-Sections: Device / Sync / Storage / About. ListRow grouped on bgL2, separator inset.
+Binds: `DeviceIdentity` (Device), `PairingState` (Sync).
 
 ## Unsupported
 
-Apple ref: none — required by CLAUDE.md "No silent fallback" for Safari (no WebTransport).
+Single static state for Safari (no WebTransport).
 
 ```
-┌─────────────────────────────┐
-│                             │
-│         [ icon ]            │ ← lucide AlertTriangle, size 48, secondaryLabel
-│                             │
-│   Browser not supported     │ ← title2
-│                             │
-│   This browser lacks        │ ← body, secondaryLabel
-│   WebTransport.             │
-│   Use Chrome, Edge, or      │
-│   download the desktop app. │
-│                             │
-│   [ Get desktop app ]       │ ← Button tinted
-│                             │
-└─────────────────────────────┘
+┌─────────────────────────────────────────┐
+│                                         │
+│         [ AlertTriangle ]               │
+│                                         │
+│   Browser not supported                 │
+│                                         │
+│   This browser lacks WebTransport.      │
+│   Use Chrome, Edge, or download         │
+│   the desktop app.                      │
+│                                         │
+│   [ Get desktop app ]                   │
+└─────────────────────────────────────────┘
 ```
 
-Binds: none.
-
-States: single static state. No retry. No silent fallback ever.
+Centered. Icon = `AlertTriangle` size 48, `text-label-secondary`. Title `text-title`, body `text-callout text-label-secondary`. Button = pill variant. No retry, no silent fallback (CLAUDE.md rule).

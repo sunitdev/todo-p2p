@@ -7,9 +7,12 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --port 5173",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "bun test ./__tests__",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@todo-p2p/core": "workspace:*",
     "@todo-p2p/ui": "workspace:*",
     "react": "18.3.1",
     "react-dom": "18.3.1"
@@ -20,6 +23,7 @@
     "@types/react-dom": "18.3.1",
     "@vitejs/plugin-react": "4.3.4",
     "tailwindcss": "4.3.0",
-    "vite": "5.4.11"
+    "vite": "5.4.11",
+    "vite-plugin-wasm": "3.6.0"
   }
 }

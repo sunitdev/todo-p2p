@@ -1,12 +1,20 @@
 import * as Automerge from "@automerge/automerge";
 import type { TodoDoc } from "../todoStore.ts";
 
-export const CURRENT_SCHEMA_VERSION = 1;
+export const CURRENT_SCHEMA_VERSION = 3;
 
 type Migration = (doc: TodoDoc) => void;
 
 const migrations: Record<number, Migration> = {
-  // Future: 2: (doc) => { ... }
+  2: (doc) => {
+    doc.areas = doc.areas ?? {};
+    doc.areaOrder = doc.areaOrder ?? [];
+    doc.projects = doc.projects ?? {};
+    doc.projectOrder = doc.projectOrder ?? [];
+  },
+  // v3 adds optional Todo fields (areaId, notes, dueDate, scheduledFor,
+  // scheduledWhen, flagged). All optional → no structural backfill required.
+  3: (_doc) => {},
 };
 
 /**
@@ -20,7 +28,10 @@ export function migrate(doc: Automerge.Doc<TodoDoc>): Automerge.Doc<TodoDoc> {
     const step = migrations[v];
     current = Automerge.change(current, `migrate to v${v}`, (d) => {
       if (step) step(d);
-      d.meta = d.meta ?? { schemaVersion: 0 };
+      // Re-assigning `d.meta` to itself crashes Automerge with
+      // "Cannot create a reference to an existing document object";
+      // only initialise it when truly absent.
+      if (!d.meta) d.meta = { schemaVersion: 0 };
       d.meta.schemaVersion = v;
     });
   }

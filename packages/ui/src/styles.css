@@ -6,21 +6,30 @@
 @source "../../../apps/desktop/src/**/*.{ts,tsx}";
 
 @theme {
-  --color-label: #000000;
-  --color-label-secondary: #3C3C43F2;
-  --color-label-tertiary: #3C3C434D;
-  --color-label-quaternary: #3C3C432E;
-  --color-separator: #3C3C4349;
+  --color-label: #1D1D1F;
+  --color-label-secondary: #6E6E73;
+  --color-label-tertiary: #A1A1A6;
+  --color-label-quaternary: #C7C7CC;
+  --color-separator: #0000001A;
 
-  --color-bg-l1: #FFFFFF;
-  --color-bg-l2: #F2F2F7;
-  --color-bg-l3: #FFFFFF;
+  --color-bg-l1: #F5F5F4;
+  --color-bg-l2: #FAFAFA;
+  --color-bg-l3: #E8E8E6;
+
+  --color-row-selected: #007AFF;
 
   --color-tint: #007AFF;
-  --color-red: #FF3B30;
-  --color-orange: #FF9500;
-  --color-yellow: #FFCC00;
-  --color-green: #34C759;
+  --color-blue: #3478F6;
+  --color-red: #E03E3E;
+  --color-orange: #FF9F0A;
+  --color-yellow: #F5C518;
+  --color-green: #3FA34D;
+  --color-teal: #3CB6B0;
+  --color-indigo: #5856D6;
+  --color-purple: #AF52DE;
+  --color-pink: #FF2D55;
+  --color-tan: #C7A06A;
+  --color-gray: #8E8E93;
 
   --spacing: 4px;
 
@@ -33,49 +42,52 @@
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
 
-  --text-caption2: 11px;
-  --text-caption2--line-height: 13px;
-  --text-caption1: 12px;
-  --text-caption1--line-height: 16px;
-  --text-footnote: 13px;
-  --text-footnote--line-height: 18px;
-  --text-subhead: 15px;
-  --text-subhead--line-height: 20px;
-  --text-callout: 16px;
-  --text-callout--line-height: 21px;
-  --text-body: 17px;
-  --text-body--line-height: 22px;
-  --text-headline: 17px;
-  --text-headline--line-height: 22px;
-  --text-title3: 20px;
-  --text-title3--line-height: 25px;
-  --text-title2: 22px;
-  --text-title2--line-height: 28px;
-  --text-title1: 28px;
-  --text-title1--line-height: 34px;
-  --text-largetitle: 34px;
-  --text-largetitle--line-height: 41px;
+  --text-caption: 11px;
+  --text-caption--line-height: 14px;
+  --text-caption1: 11px;
+  --text-caption1--line-height: 14px;
+  --text-footnote: 12px;
+  --text-footnote--line-height: 16px;
+  --text-body: 13px;
+  --text-body--line-height: 17px;
+  --text-callout: 14px;
+  --text-callout--line-height: 18px;
+  --text-headline: 15px;
+  --text-headline--line-height: 20px;
+  --text-title: 22px;
+  --text-title--line-height: 26px;
 
   --shadow-ambient: 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-  --shadow-key: 0 8px 24px -4px rgba(0, 0, 0, 0.12);
-  --shadow-glow: 0 0 32px 0 rgba(10, 132, 255, 0.35);
 }
 
 @media (prefers-color-scheme: dark) {
   @theme {
-    --color-label: #FFFFFF;
-    --color-label-secondary: #EBEBF5F2;
-    --color-label-tertiary: #EBEBF54D;
-    --color-label-quaternary: #EBEBF52E;
-    --color-separator: #54545899;
-    --color-bg-l1: #000000;
+    --color-label: #F2F2F2;
+    --color-label-secondary: #A1A1A6;
+    --color-label-tertiary: #6E6E73;
+    --color-label-quaternary: #48484A;
+    --color-separator: #FFFFFF14;
+
+    --color-bg-l1: #2C2C2E;
     --color-bg-l2: #1C1C1E;
-    --color-bg-l3: #2C2C2E;
+    --color-bg-l3: #3A3A3C;
+
+    --color-row-selected: #0A84FF;
+
     --color-tint: #0A84FF;
-    --color-red: #FF453A;
+    --color-blue: #3478F6;
+    --color-red: #E03E3E;
     --color-orange: #FF9F0A;
-    --color-yellow: #FFD60A;
-    --color-green: #30D158;
+    --color-yellow: #F5C518;
+    --color-green: #3FA34D;
+    --color-teal: #3CB6B0;
+    --color-indigo: #5E5CE6;
+    --color-purple: #BF5AF2;
+    --color-pink: #FF375F;
+    --color-tan: #C7A06A;
+    --color-gray: #98989D;
+
+    --shadow-ambient: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
   }
 }
 
@@ -84,7 +96,7 @@
     height: 100%;
   }
   body {
-    background-color: var(--color-bg-l1);
+    background-color: var(--color-bg-l2);
     color: var(--color-label);
     font-family: var(--font-sans);
     font-size: var(--text-body);
@@ -95,19 +107,7 @@
 }
 
 @layer components {
-  .glass-ultra-thin { backdrop-filter: blur(20px) saturate(1.8); background-color: rgba(255, 255, 255, 0.45); }
-  .glass-thin       { backdrop-filter: blur(30px) saturate(1.8); background-color: rgba(255, 255, 255, 0.60); }
-  .glass-regular    { backdrop-filter: blur(40px) saturate(1.8); background-color: rgba(255, 255, 255, 0.72); }
-  .glass-thick      { backdrop-filter: blur(50px) saturate(1.8); background-color: rgba(255, 255, 255, 0.82); }
-  .glass-chrome     { backdrop-filter: blur(60px) saturate(2.0); background-color: rgba(248, 248, 250, 0.90); }
-}
-
-@media (prefers-color-scheme: dark) {
-  @layer components {
-    .glass-ultra-thin { background-color: rgba(28, 28, 30, 0.35); }
-    .glass-thin       { background-color: rgba(28, 28, 30, 0.50); }
-    .glass-regular    { background-color: rgba(28, 28, 30, 0.64); }
-    .glass-thick      { background-color: rgba(28, 28, 30, 0.76); }
-    .glass-chrome     { background-color: rgba(36, 36, 38, 0.86); }
-  }
+  .row-hover { @apply hover:bg-bg-l3; }
+  .row-selected { @apply bg-[var(--color-row-selected)] text-white; }
+  .section-header { @apply text-caption font-semibold uppercase tracking-wider text-label-tertiary; }
 }
