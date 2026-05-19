@@ -10,9 +10,13 @@ import {
 import type {
   Area,
   AreaInput,
+  Heading,
+  HeadingInput,
   Project,
   ProjectInput,
   SyncEngine,
+  Tag,
+  TagInput,
   Todo,
 } from '@todo-p2p/core';
 import { newId } from './id';
@@ -29,18 +33,29 @@ export type TodoPatch = Partial<
     | 'scheduledFor'
     | 'scheduledWhen'
     | 'flagged'
+    | 'recurrence'
+    | 'eveningOnToday'
+    | 'headingId'
+    | 'tagIds'
   >
 >;
 
 export type TodoInput = Omit<Todo, 'id' | 'done' | 'createdAt'> & { id?: string };
 
+export type BulkTodoPatch = TodoPatch & { done?: boolean };
+
 export interface StoreValue {
   todos: Todo[];
   areas: Area[];
   projects: Project[];
+  headings: Heading[];
+  tags: Tag[];
 
   addTodo(input: TodoInput): Promise<void>;
   updateTodo(id: string, patch: TodoPatch): Promise<void>;
+  removeTodo(id: string): Promise<void>;
+  reorderTodo(id: string, newIndex: number): Promise<void>;
+  bulkUpdateTodos(ids: readonly string[], patch: BulkTodoPatch): Promise<void>;
 
   addArea(input: AreaInput): Promise<void>;
   updateArea(id: string, patch: Partial<Omit<Area, 'id' | 'createdAt'>>): Promise<void>;
@@ -52,6 +67,17 @@ export interface StoreValue {
     patch: Partial<Omit<Project, 'id' | 'createdAt'>>,
   ): Promise<void>;
   removeProject(id: string): Promise<void>;
+
+  addHeading(input: HeadingInput): Promise<void>;
+  updateHeading(
+    id: string,
+    patch: Partial<Pick<Heading, 'title' | 'order' | 'projectId'>>,
+  ): Promise<void>;
+  removeHeading(id: string): Promise<void>;
+
+  addTag(input: TagInput): Promise<void>;
+  updateTag(id: string, patch: Partial<Pick<Tag, 'name' | 'color'>>): Promise<void>;
+  removeTag(id: string): Promise<void>;
 }
 
 const StoreCtx = createContext<StoreValue | null>(null);
@@ -92,9 +118,20 @@ export function StoreProvider({
       todos: store.list(),
       areas: store.listAreas(),
       projects: store.listProjects(),
+      headings: store.listHeadings(),
+      tags: store.listTags(),
 
       addTodo: ({ id, ...rest }) => commit(store.add({ id: id ?? newId(), ...rest })),
       updateTodo: (id, patch) => commit(store.updateTodo(id, patch)),
+      removeTodo: (id) => commit(store.remove(id)),
+      reorderTodo: async (id, newIndex) => {
+        const change = store.reorderTodo(id, newIndex);
+        if (change) await commit(change);
+      },
+      bulkUpdateTodos: async (ids, patch) => {
+        const change = store.bulkUpdate(ids, patch);
+        if (change) await commit(change);
+      },
 
       addArea: (input) => commit(store.addArea(input)),
       updateArea: (id, patch) => commit(store.updateArea(id, patch)),
@@ -103,6 +140,14 @@ export function StoreProvider({
       addProject: (input) => commit(store.addProject(input)),
       updateProject: (id, patch) => commit(store.updateProject(id, patch)),
       removeProject: (id) => commit(store.removeProject(id)),
+
+      addHeading: (input) => commit(store.addHeading(input)),
+      updateHeading: (id, patch) => commit(store.updateHeading(id, patch)),
+      removeHeading: (id) => commit(store.removeHeading(id)),
+
+      addTag: (input) => commit(store.addTag(input)),
+      updateTag: (id, patch) => commit(store.updateTag(id, patch)),
+      removeTag: (id) => commit(store.removeTag(id)),
     };
   }, [store, commit, version]);
 
@@ -113,4 +158,13 @@ export function useStore(): StoreValue {
   const ctx = useContext(StoreCtx);
   if (!ctx) throw new Error('useStore must be used within <StoreProvider>');
   return ctx;
+}
+
+/**
+ * Non-throwing variant for components that may render outside `<StoreProvider>`
+ * (e.g. standalone unit tests for `TodoRow`). Returns `null` when absent so
+ * the caller can short-circuit features that need store data (like tag chips).
+ */
+export function useStoreOptional(): StoreValue | null {
+  return useContext(StoreCtx);
 }

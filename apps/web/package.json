@@ -12,8 +12,11 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@tauri-apps/api": "2",
     "@todo-p2p/core": "workspace:*",
     "@todo-p2p/ui": "workspace:*",
+    "lucide-react": "0.460.0",
+    "motion": "12.39.0",
     "react": "18.3.1",
     "react-dom": "18.3.1"
   },

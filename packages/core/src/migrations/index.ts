@@ -1,7 +1,7 @@
 import * as Automerge from "@automerge/automerge";
 import type { TodoDoc } from "../todoStore.ts";
 
-export const CURRENT_SCHEMA_VERSION = 3;
+export const CURRENT_SCHEMA_VERSION = 4;
 
 type Migration = (doc: TodoDoc) => void;
 
@@ -15,6 +15,17 @@ const migrations: Record<number, Migration> = {
   // v3 adds optional Todo fields (areaId, notes, dueDate, scheduledFor,
   // scheduledWhen, flagged). All optional → no structural backfill required.
   3: (_doc) => {},
+  // v4 adds headings + tags doc-collections + optional Todo fields
+  // (recurrence, eveningOnToday, headingId, tagIds). Per-todo fields stay
+  // optional so we skip backfill — readers treat absent as "not set" /
+  // empty-array, matching the prior optional-field convention. We only
+  // create the structural top-level maps, idempotently.
+  4: (doc) => {
+    if (!doc.headings) doc.headings = {};
+    if (!doc.headingOrder) doc.headingOrder = [];
+    if (!doc.tags) doc.tags = {};
+    if (!doc.tagOrder) doc.tagOrder = [];
+  },
 };
 
 /**

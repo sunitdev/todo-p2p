@@ -11,6 +11,7 @@ export default [
       '**/build/**',
       '**/target/**',
       'apps/desktop/src-tauri/gen/**',
+      'apps/mobile/**',
     ],
   },
   js.configs.recommended,

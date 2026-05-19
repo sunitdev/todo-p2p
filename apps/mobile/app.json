@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "todo-p2p",
+    "slug": "todo-p2p",
+    "version": "0.0.0",
+    "orientation": "portrait",
+    "scheme": "todop2p",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.todop2p.app"
+    },
+    "android": {
+      "package": "com.todop2p.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#1C1C1E"
+      }
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

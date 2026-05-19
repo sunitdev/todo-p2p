@@ -1,20 +1,39 @@
 import * as Automerge from "@automerge/automerge";
 import { CURRENT_SCHEMA_VERSION, migrate } from "./migrations/index.ts";
 
+/**
+ * Repeating-todo rule (rrule-lite). Stored on the seed; engine derives next
+ * occurrence on completion. `interval` = every-N (1 = every period).
+ */
+export interface Recurrence {
+  kind: "daily" | "weekly" | "monthly" | "yearly";
+  interval: number;
+}
+
 export interface Todo {
   id: string;
   title: string;
   done: boolean;
   createdAt: number;
   completedAt?: number;
+  /** @deprecated Free-text tags. New code should use `tagIds` against `tags` collection. */
   tags?: string[];
   projectId?: string | null;
   areaId?: string | null;
   notes?: string;
+  /** Hard deadline (epoch ms). Independent of `scheduledFor` (start). */
   dueDate?: number;
   scheduledFor?: number;
   scheduledWhen?: "today" | "someday" | null;
   flagged?: boolean;
+  /** Repeating-rule for the todo. */
+  recurrence?: Recurrence;
+  /** When `scheduledWhen === 'today'`: true = "This Evening" group, else "This Morning". */
+  eveningOnToday?: boolean;
+  /** Project-scoped heading the todo lives under. */
+  headingId?: string | null;
+  /** Many-to-many tag association by `Tag.id`. */
+  tagIds?: string[];
 }
 
 export type IconRef =
@@ -23,6 +42,7 @@ export type IconRef =
 
 export const PALETTE_COLORS = [
   "tint",
+  "blue",
   "red",
   "orange",
   "yellow",
@@ -31,6 +51,7 @@ export const PALETTE_COLORS = [
   "indigo",
   "purple",
   "pink",
+  "tan",
   "gray",
 ] as const;
 
@@ -53,6 +74,25 @@ export interface Project {
   createdAt: number;
 }
 
+/** Sub-divider inside a project; todos can be filed under a heading. */
+export interface Heading {
+  id: string;
+  projectId: string;
+  title: string;
+  order: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** User-defined coloured chip; many-to-many with todos via `Todo.tagIds`. */
+export interface Tag {
+  id: string;
+  name: string;
+  color: PaletteColor;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface TodoDoc {
   todos: Record<string, Todo>;
   order: string[];
@@ -60,6 +100,10 @@ export interface TodoDoc {
   areaOrder: string[];
   projects: Record<string, Project>;
   projectOrder: string[];
+  headings: Record<string, Heading>;
+  headingOrder: string[];
+  tags: Record<string, Tag>;
+  tagOrder: string[];
   meta: { schemaVersion: number };
 }
 
@@ -71,6 +115,18 @@ export type ProjectInput = {
   icon: IconRef;
   color: PaletteColor;
   areaId?: string | null | undefined;
+};
+export type HeadingInput = {
+  id: string;
+  projectId: string;
+  title: string;
+  /** Optional; appended at end of project's headings when omitted. */
+  order?: number;
+};
+export type TagInput = {
+  id: string;
+  name: string;
+  color: PaletteColor;
 };
 
 export class TodoStore {
@@ -88,6 +144,10 @@ export class TodoStore {
       d.areaOrder = [];
       d.projects = {};
       d.projectOrder = [];
+      d.headings = {};
+      d.headingOrder = [];
+      d.tags = {};
+      d.tagOrder = [];
       d.meta = { schemaVersion: CURRENT_SCHEMA_VERSION };
     });
     return new TodoStore(doc);
@@ -120,6 +180,10 @@ export class TodoStore {
       if (input.scheduledFor !== undefined) todo.scheduledFor = input.scheduledFor;
       if (input.scheduledWhen !== undefined) todo.scheduledWhen = input.scheduledWhen;
       if (input.flagged !== undefined) todo.flagged = input.flagged;
+      if (input.recurrence !== undefined) todo.recurrence = { ...input.recurrence };
+      if (input.eveningOnToday !== undefined) todo.eveningOnToday = input.eveningOnToday;
+      if (input.headingId !== undefined) todo.headingId = input.headingId;
+      if (input.tagIds !== undefined) todo.tagIds = [...input.tagIds];
       d.todos[input.id] = todo;
       d.order.push(input.id);
     });
@@ -141,6 +205,10 @@ export class TodoStore {
         | "scheduledFor"
         | "scheduledWhen"
         | "flagged"
+        | "recurrence"
+        | "eveningOnToday"
+        | "headingId"
+        | "tagIds"
       >
     >,
   ): Uint8Array {
@@ -160,6 +228,11 @@ export class TodoStore {
       if (patch.scheduledFor !== undefined) t.scheduledFor = patch.scheduledFor;
       if (patch.scheduledWhen !== undefined) t.scheduledWhen = patch.scheduledWhen;
       if (patch.flagged !== undefined) t.flagged = patch.flagged;
+      if (patch.recurrence !== undefined) t.recurrence = { ...patch.recurrence };
+      if (patch.eveningOnToday !== undefined) t.eveningOnToday = patch.eveningOnToday;
+      if (patch.headingId !== undefined) t.headingId = patch.headingId;
+      // Replace whole array — caller-side merging avoids Automerge list-edit churn.
+      if (patch.tagIds !== undefined) t.tagIds = [...patch.tagIds];
     });
     return lastChange(before, this.doc);
   }
@@ -307,6 +380,226 @@ export class TodoStore {
   /** Heads, for sync engine to compute diffs. */
   heads(): Automerge.Heads {
     return Automerge.getHeads(this.doc);
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // region: headings + tags + recurrence (Phase 3 + 7 schema additions)
+  //
+  // Agent B owns this region. Agent A (rows + multi-select) is also extending
+  // this class and will append `reorderTodo`/`bulkUpdate` in a separate region
+  // below; do not interleave methods here.
+  // ───────────────────────────────────────────────────────────────────────────
+
+  addHeading(input: HeadingInput): Uint8Array {
+    const before = this.doc;
+    this.doc = Automerge.change(before, `heading:add ${input.id}`, (d) => {
+      const now = Date.now();
+      // Compute order at write-time if caller didn't pin one. We count siblings
+      // in the same project rather than using global headingOrder length so
+      // ordering is project-local and predictable.
+      const orderValue =
+        input.order ??
+        Object.values(d.headings).filter((h) => h.projectId === input.projectId).length;
+      d.headings[input.id] = {
+        id: input.id,
+        projectId: input.projectId,
+        title: input.title,
+        order: orderValue,
+        createdAt: now,
+        updatedAt: now,
+      };
+      d.headingOrder.push(input.id);
+    });
+    return lastChange(before, this.doc);
+  }
+
+  updateHeading(
+    id: string,
+    patch: Partial<Pick<Heading, "title" | "order" | "projectId">>,
+  ): Uint8Array {
+    const before = this.doc;
+    this.doc = Automerge.change(before, `heading:update ${id}`, (d) => {
+      const h = d.headings[id];
+      if (!h) return;
+      if (patch.title !== undefined) h.title = patch.title;
+      if (patch.order !== undefined) h.order = patch.order;
+      if (patch.projectId !== undefined) h.projectId = patch.projectId;
+      h.updatedAt = Date.now();
+    });
+    return lastChange(before, this.doc);
+  }
+
+  /** Removes a heading. Any todo that referenced it has `headingId` cleared. */
+  removeHeading(id: string): Uint8Array {
+    const before = this.doc;
+    this.doc = Automerge.change(before, `heading:remove ${id}`, (d) => {
+      delete d.headings[id];
+      const idx = d.headingOrder.indexOf(id);
+      if (idx >= 0) d.headingOrder.splice(idx, 1);
+      for (const t of Object.values(d.todos)) {
+        if (t.headingId === id) t.headingId = null;
+      }
+    });
+    return lastChange(before, this.doc);
+  }
+
+  listHeadings(): Heading[] {
+    return this.doc.headingOrder
+      .map((id) => this.doc.headings[id])
+      .filter((h): h is Heading => h !== undefined);
+  }
+
+  getHeading(id: string): Heading | undefined {
+    return this.doc.headings[id];
+  }
+
+  addTag(input: TagInput): Uint8Array {
+    const before = this.doc;
+    this.doc = Automerge.change(before, `tag:add ${input.id}`, (d) => {
+      const now = Date.now();
+      d.tags[input.id] = {
+        id: input.id,
+        name: input.name,
+        color: input.color,
+        createdAt: now,
+        updatedAt: now,
+      };
+      d.tagOrder.push(input.id);
+    });
+    return lastChange(before, this.doc);
+  }
+
+  updateTag(id: string, patch: Partial<Pick<Tag, "name" | "color">>): Uint8Array {
+    const before = this.doc;
+    this.doc = Automerge.change(before, `tag:update ${id}`, (d) => {
+      const tag = d.tags[id];
+      if (!tag) return;
+      if (patch.name !== undefined) tag.name = patch.name;
+      if (patch.color !== undefined) tag.color = patch.color;
+      tag.updatedAt = Date.now();
+    });
+    return lastChange(before, this.doc);
+  }
+
+  /** Removes a tag and strips it from every todo's `tagIds`. */
+  removeTag(id: string): Uint8Array {
+    const before = this.doc;
+    this.doc = Automerge.change(before, `tag:remove ${id}`, (d) => {
+      delete d.tags[id];
+      const idx = d.tagOrder.indexOf(id);
+      if (idx >= 0) d.tagOrder.splice(idx, 1);
+      for (const t of Object.values(d.todos)) {
+        if (!t.tagIds) continue;
+        const i = t.tagIds.indexOf(id);
+        if (i >= 0) t.tagIds.splice(i, 1);
+      }
+    });
+    return lastChange(before, this.doc);
+  }
+
+  listTags(): Tag[] {
+    return this.doc.tagOrder
+      .map((id) => this.doc.tags[id])
+      .filter((t): t is Tag => t !== undefined);
+  }
+
+  getTag(id: string): Tag | undefined {
+    return this.doc.tags[id];
+  }
+
+  // ── Filter helpers (read-only views over the current snapshot) ────────────
+
+  getTodosByTag(tagId: string): Todo[] {
+    return this.list().filter((t) => t.tagIds?.includes(tagId) ?? false);
+  }
+
+  getTodosByHeading(headingId: string): Todo[] {
+    return this.list().filter((t) => t.headingId === headingId);
+  }
+
+  /** Today + explicitly marked as evening. */
+  getEveningTodos(): Todo[] {
+    return this.list().filter(
+      (t) => t.scheduledWhen === "today" && t.eveningOnToday === true,
+    );
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // region: row-level operations (Phase 2: drag-reorder + multi-select)
+  // ───────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Reorder a todo to a new visible index. `newIndex` is clamped to [0, len-1].
+   * Returns `null` when the call is a no-op (missing id or same index) so
+   * callers can skip emitting an empty sync packet.
+   */
+  reorderTodo(id: string, newIndex: number): Uint8Array | null {
+    const before = this.doc;
+    const currentIdx = before.order.indexOf(id);
+    if (currentIdx < 0) return null;
+    if (before.order.length === 0) return null;
+    const clamped = Math.max(0, Math.min(newIndex, before.order.length - 1));
+    if (clamped === currentIdx) return null;
+    this.doc = Automerge.change(before, `reorder ${id}`, (d) => {
+      d.order.splice(currentIdx, 1);
+      d.order.splice(clamped, 0, id);
+    });
+    return lastChange(before, this.doc);
+  }
+
+  /**
+   * Apply the same patch to many todos in one Automerge change so multi-select
+   * actions land as one sync packet rather than N separate commits. Missing
+   * ids are silently skipped; returns `null` when nothing was touched.
+   */
+  bulkUpdate(
+    ids: readonly string[],
+    patch: Partial<
+      Pick<
+        Todo,
+        | "title"
+        | "tags"
+        | "projectId"
+        | "areaId"
+        | "notes"
+        | "dueDate"
+        | "scheduledFor"
+        | "scheduledWhen"
+        | "flagged"
+      > & { done?: boolean }
+    >,
+  ): Uint8Array | null {
+    const before = this.doc;
+    let touched = false;
+    this.doc = Automerge.change(before, `bulk-update ${ids.length}`, (d) => {
+      for (const id of ids) {
+        const t = d.todos[id];
+        if (!t) continue;
+        touched = true;
+        if (patch.title !== undefined) t.title = patch.title;
+        if (patch.tags !== undefined) t.tags = patch.tags;
+        if (patch.projectId !== undefined) t.projectId = patch.projectId;
+        if (patch.areaId !== undefined) t.areaId = patch.areaId;
+        if (patch.notes !== undefined) {
+          if (patch.notes === "") delete t.notes;
+          else t.notes = patch.notes;
+        }
+        if (patch.dueDate !== undefined) t.dueDate = patch.dueDate;
+        if (patch.scheduledFor !== undefined) t.scheduledFor = patch.scheduledFor;
+        if (patch.scheduledWhen !== undefined) t.scheduledWhen = patch.scheduledWhen;
+        if (patch.flagged !== undefined) t.flagged = patch.flagged;
+        if (patch.done !== undefined) {
+          t.done = patch.done;
+          if (patch.done) t.completedAt = Date.now();
+          else delete t.completedAt;
+        }
+      }
+    });
+    if (!touched) {
+      this.doc = before;
+      return null;
+    }
+    return lastChange(before, this.doc);
   }
 }
 

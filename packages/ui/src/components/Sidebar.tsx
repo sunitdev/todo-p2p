@@ -15,16 +15,21 @@ import {
   Trash2,
   type LucideIcon,
 } from 'lucide-react';
-import type { Area, Project } from '@todo-p2p/core';
+import type { Area, Project, Tag } from '@todo-p2p/core';
 import { cn } from '../lib/cn';
-import { COLOR_BG, COLOR_BORDER } from '../lib/palette';
+import { COLOR_BG } from '../lib/palette';
+import { getLucide } from '../lib/icons';
+import { useDropTarget } from '../lib/DragContext';
 import { ContextMenu, type ContextMenuItem } from './ContextMenu';
+import { ProgressIcon, type ProgressIconInner } from './ProgressIcon';
+import { SidebarCount } from './SidebarCount';
 
 export type SectionId = 'inbox' | 'today' | 'upcoming' | 'anytime' | 'someday' | 'logbook';
 
 export type Selection =
   | { kind: 'section'; id: SectionId }
-  | { kind: 'project'; id: string };
+  | { kind: 'project'; id: string }
+  | { kind: 'tag'; id: string };
 
 type FixedSection = {
   id: SectionId;
@@ -58,23 +63,41 @@ export function Sidebar({
   onSelect,
   areas,
   projects,
+  tags = [],
   onCreateArea,
   onCreateProject,
+  onCreateTag,
   onEditArea,
   onEditProject,
+  onEditTag,
   onDeleteArea,
   onDeleteProject,
+  onDeleteTag,
+  projectProgress,
+  tagCount,
 }: {
   selection: Selection;
   onSelect(s: Selection): void;
   areas: Area[];
   projects: Project[];
+  tags?: Tag[];
   onCreateArea(): void;
   onCreateProject(areaId: string | null): void;
+  onCreateTag?(): void;
   onEditArea(a: Area): void;
   onEditProject(p: Project): void;
+  onEditTag?(t: Tag): void;
   onDeleteArea(a: Area): void;
   onDeleteProject(p: Project): void;
+  onDeleteTag?(t: Tag): void;
+  /**
+   * Per-project completion 0..1. Computed by the screen owner (which has store
+   * access). Defaults to 0 when absent so the sidebar can render without a
+   * progress map in tests / stories.
+   */
+  projectProgress?: (projectId: string) => number;
+  /** Tagged-todo counts. Caller computes from `store.todos`; defaults to 0. */
+  tagCount?: (tagId: string) => number;
 }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [menu, setMenu] = useState<MenuState | null>(null);
@@ -125,6 +148,14 @@ export function Sidebar({
     });
   };
 
+  const showTagMenu = (x: number, y: number, t: Tag) => {
+    if (!onEditTag && !onDeleteTag) return;
+    const items: ContextMenuItem[] = [];
+    if (onEditTag) items.push({ label: 'Edit tag', icon: <Pencil className="size-3.5" />, onSelect: () => onEditTag(t) });
+    if (onDeleteTag) items.push({ label: 'Delete tag', icon: <Trash2 className="size-3.5" />, destructive: true, onSelect: () => onDeleteTag(t) });
+    setMenu({ x, y, items });
+  };
+
   return (
     <aside className="flex w-[260px] shrink-0 flex-col border-r border-separator bg-bg-l1">
       <div className="h-12 shrink-0" />
@@ -166,6 +197,7 @@ export function Sidebar({
                 active={selection.kind === 'project' && selection.id === p.id}
                 onClick={() => onSelect({ kind: 'project', id: p.id })}
                 onMenu={(x, y) => showProjectMenu(x, y, p)}
+                progress={projectProgress?.(p.id) ?? 0}
               />
             ))}
           </div>
@@ -210,6 +242,7 @@ export function Sidebar({
                           onClick={() => onSelect({ kind: 'project', id: p.id })}
                           onMenu={(x, y) => showProjectMenu(x, y, p)}
                           indent
+                          progress={projectProgress?.(p.id) ?? 0}
                         />
                       ))}
                     </div>
@@ -220,6 +253,15 @@ export function Sidebar({
           </div>
         )}
       </div>
+
+      <TagSection
+        tags={tags}
+        selection={selection}
+        onSelect={onSelect}
+        onCreateTag={onCreateTag}
+        onMenu={showTagMenu}
+        tagCount={tagCount}
+      />
 
       <div className="mt-auto flex items-center justify-between border-t border-separator px-3 py-2">
         <button
@@ -262,32 +304,34 @@ function FixedRow({
   onClick(): void;
 }) {
   const Icon = section.icon;
+  // Logbook is read-only — completed todos live there. Filing a new to-do
+  // onto Logbook makes no sense, so we leave it out of the drop registry.
+  const { ref, isActive } = useDropTarget(section.id, 'sidebar-section', {
+    enabled: section.id !== 'logbook',
+  });
   return (
     <button
+      ref={ref}
       onClick={onClick}
       className={cn(
         'group flex h-7 items-center gap-2.5 rounded-2 px-2 text-callout transition-colors',
         active
           ? 'row-selected'
           : 'text-label hover:bg-bg-l3',
+        isActive && 'ring-2 ring-tint',
       )}
       aria-current={active ? 'page' : undefined}
+      data-drop-active={isActive ? 'true' : undefined}
     >
       <Icon
         className={cn('size-4 shrink-0', active ? 'text-white' : section.iconClass)}
         fill={section.fill ? 'currentColor' : 'none'}
       />
       <span className="flex-1 text-left">{section.name}</span>
-      {section.count > 0 && (
-        <span
-          className={cn(
-            'text-footnote tabular-nums',
-            active ? 'text-white/80' : 'text-label-tertiary',
-          )}
-        >
-          {section.count}
-        </span>
-      )}
+      <SidebarCount
+        value={section.count}
+        className={active ? 'text-white/80' : 'text-label-tertiary'}
+      />
     </button>
   );
 }
@@ -305,13 +349,19 @@ function AreaRow({
   onMenu(x: number, y: number): void;
   onAddProject(): void;
 }) {
+  const { ref, isActive } = useDropTarget(area.id, 'sidebar-area');
   return (
     <div
-      className="group flex h-7 items-center gap-1.5 rounded-2 px-2 hover:bg-bg-l3"
+      ref={ref}
+      className={cn(
+        'group flex h-7 items-center gap-1.5 rounded-2 px-2 hover:bg-bg-l3',
+        isActive && 'ring-2 ring-tint',
+      )}
       onContextMenu={(e) => {
         e.preventDefault();
         onMenu(e.clientX, e.clientY);
       }}
+      data-drop-active={isActive ? 'true' : undefined}
     >
       <button
         onClick={onToggle}
@@ -353,30 +403,42 @@ function ProjectRow({
   onClick,
   onMenu,
   indent,
+  progress,
 }: {
   project: Project;
   active: boolean;
   onClick(): void;
   onMenu(x: number, y: number): void;
   indent?: boolean;
+  progress: number;
 }) {
+  const { ref, isActive } = useDropTarget(project.id, 'sidebar-project');
   return (
     <div
+      ref={ref}
       onContextMenu={(e) => {
         e.preventDefault();
         onMenu(e.clientX, e.clientY);
       }}
+      data-drop-active={isActive ? 'true' : undefined}
       className={cn(
         'group flex h-7 items-center gap-2 rounded-2 px-2 transition-colors',
         indent && 'pl-5',
         active ? 'row-selected' : 'text-label hover:bg-bg-l3',
+        isActive && 'ring-2 ring-tint',
       )}
     >
       <button
         onClick={onClick}
         className="flex flex-1 items-center gap-2 truncate text-left text-callout"
       >
-        <ProjectIcon project={project} active={active} />
+        <ProgressIcon
+          size="sm"
+          color={project.color}
+          progress={progress}
+          inner={projectInner(project)}
+          active={active}
+        />
         <span className="truncate">{project.title}</span>
       </button>
       <button
@@ -393,20 +455,102 @@ function ProjectRow({
   );
 }
 
-function ProjectIcon({ project, active }: { project: Project; active?: boolean }) {
-  if (project.icon.kind === 'emoji') {
-    return (
-      <span className="inline-flex size-3.5 items-center justify-center text-[12px] leading-none">
-        {project.icon.value}
-      </span>
-    );
-  }
+function TagSection({
+  tags,
+  selection,
+  onSelect,
+  onCreateTag,
+  onMenu,
+  tagCount,
+}: {
+  tags: Tag[];
+  selection: Selection;
+  onSelect(s: Selection): void;
+  onCreateTag: (() => void) | undefined;
+  onMenu(x: number, y: number, t: Tag): void;
+  tagCount: ((tagId: string) => number) | undefined;
+}) {
+  if (tags.length === 0 && !onCreateTag) return null;
   return (
-    <span
-      className={cn(
-        'inline-block size-3 shrink-0 rounded-full border-2',
-        active ? 'border-white' : COLOR_BORDER[project.color],
+    <div className="mt-5 px-2">
+      <div className="section-header flex items-center justify-between px-2 pb-1">
+        <span>Tags</span>
+        {onCreateTag && (
+          <button
+            onClick={onCreateTag}
+            aria-label="New tag"
+            className="inline-flex size-5 items-center justify-center rounded-1 text-label-tertiary hover:bg-bg-l3 hover:text-label"
+          >
+            <Plus className="size-3" />
+          </button>
+        )}
+      </div>
+      {tags.length === 0 ? (
+        <div className="px-2 py-1 text-footnote text-label-tertiary">No tags yet</div>
+      ) : (
+        <div className="flex flex-col gap-0.5">
+          {tags.map((t) => (
+            <TagRow
+              key={t.id}
+              tag={t}
+              active={selection.kind === 'tag' && selection.id === t.id}
+              count={tagCount?.(t.id) ?? 0}
+              onClick={() => onSelect({ kind: 'tag', id: t.id })}
+              onMenu={(x, y) => onMenu(x, y, t)}
+            />
+          ))}
+        </div>
       )}
-    />
+    </div>
   );
+}
+
+function TagRow({
+  tag,
+  active,
+  count,
+  onClick,
+  onMenu,
+}: {
+  tag: Tag;
+  active: boolean;
+  count: number;
+  onClick(): void;
+  onMenu(x: number, y: number): void;
+}) {
+  const { ref, isActive } = useDropTarget(tag.id, 'sidebar-tag');
+  return (
+    <button
+      ref={ref}
+      onClick={onClick}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        onMenu(e.clientX, e.clientY);
+      }}
+      aria-current={active ? 'page' : undefined}
+      data-drop-active={isActive ? 'true' : undefined}
+      className={cn(
+        'group flex h-7 items-center gap-2.5 rounded-2 px-2 text-callout transition-colors',
+        active ? 'row-selected' : 'text-label hover:bg-bg-l3',
+        isActive && 'ring-2 ring-tint',
+      )}
+    >
+      <span className={cn('size-2 shrink-0 rounded-full', COLOR_BG[tag.color])} />
+      <span className="flex-1 truncate text-left">{tag.name}</span>
+      <SidebarCount
+        value={count}
+        className={active ? 'text-white/80' : 'text-label-tertiary'}
+      />
+    </button>
+  );
+}
+
+function projectInner(project: Project): ProgressIconInner {
+  if (project.icon.kind === 'emoji') {
+    return { kind: 'emoji', value: project.icon.value };
+  }
+  if (project.icon.kind === 'lucide') {
+    return { kind: 'icon', lucide: getLucide(project.icon.name) };
+  }
+  return { kind: 'dot' };
 }

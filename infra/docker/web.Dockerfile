@@ -7,6 +7,8 @@ COPY tooling/typescript/base.json ./tooling/typescript/
 COPY packages/core/package.json ./packages/core/
 COPY packages/ui/package.json ./packages/ui/
 COPY apps/web/package.json ./apps/web/
+COPY apps/mobile/package.json ./apps/mobile/
+COPY apps/desktop/package.json ./apps/desktop/
 RUN bun install --frozen-lockfile || bun install
 
 EXPOSE 5173

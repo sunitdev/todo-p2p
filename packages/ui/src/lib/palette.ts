@@ -6,6 +6,7 @@ import type { PaletteColor } from '@todo-p2p/core';
  */
 export const COLOR_TEXT: Record<PaletteColor, string> = {
   tint: 'text-tint',
+  blue: 'text-blue',
   red: 'text-red',
   orange: 'text-orange',
   yellow: 'text-yellow',
@@ -14,11 +15,13 @@ export const COLOR_TEXT: Record<PaletteColor, string> = {
   indigo: 'text-indigo',
   purple: 'text-purple',
   pink: 'text-pink',
+  tan: 'text-tan',
   gray: 'text-gray',
 };
 
 export const COLOR_BG: Record<PaletteColor, string> = {
   tint: 'bg-tint',
+  blue: 'bg-blue',
   red: 'bg-red',
   orange: 'bg-orange',
   yellow: 'bg-yellow',
@@ -27,11 +30,13 @@ export const COLOR_BG: Record<PaletteColor, string> = {
   indigo: 'bg-indigo',
   purple: 'bg-purple',
   pink: 'bg-pink',
+  tan: 'bg-tan',
   gray: 'bg-gray',
 };
 
 export const COLOR_RING: Record<PaletteColor, string> = {
   tint: 'ring-tint',
+  blue: 'ring-blue',
   red: 'ring-red',
   orange: 'ring-orange',
   yellow: 'ring-yellow',
@@ -40,11 +45,13 @@ export const COLOR_RING: Record<PaletteColor, string> = {
   indigo: 'ring-indigo',
   purple: 'ring-purple',
   pink: 'ring-pink',
+  tan: 'ring-tan',
   gray: 'ring-gray',
 };
 
 export const COLOR_BORDER: Record<PaletteColor, string> = {
   tint: 'border-tint',
+  blue: 'border-blue',
   red: 'border-red',
   orange: 'border-orange',
   yellow: 'border-yellow',
@@ -53,11 +60,13 @@ export const COLOR_BORDER: Record<PaletteColor, string> = {
   indigo: 'border-indigo',
   purple: 'border-purple',
   pink: 'border-pink',
+  tan: 'border-tan',
   gray: 'border-gray',
 };
 
 export const COLOR_LABEL: Record<PaletteColor, string> = {
-  tint: 'Blue',
+  tint: 'Blue (system)',
+  blue: 'Blue',
   red: 'Red',
   orange: 'Orange',
   yellow: 'Yellow',
@@ -66,5 +75,6 @@ export const COLOR_LABEL: Record<PaletteColor, string> = {
   indigo: 'Indigo',
   purple: 'Purple',
   pink: 'Pink',
+  tan: 'Tan',
   gray: 'Gray',
 };

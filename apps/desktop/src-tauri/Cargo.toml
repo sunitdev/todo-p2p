@@ -11,6 +11,10 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
+# Phase 5 (Quick Entry): registers a global Cmd/Ctrl+Space shortcut so the
+# overlay can be summoned from any focused app. User-approved per CLAUDE.md
+# allowlist rule (only iroh_*, storage_*, dialog, global-shortcut allowed).
+tauri-plugin-global-shortcut = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 

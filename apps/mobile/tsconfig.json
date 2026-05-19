@@ -1,0 +1,9 @@
+{
+  "extends": "../../tooling/typescript/base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "noEmit": true
+  },
+  "//": "deps (expo, react-native) not installed yet. After `bun install` (post-approval), set: \"include\": [\"app/**/*\", \"src/**/*\"] and add \"types\": [\"expo\", \"react-native\"] etc. Mobile typecheck script removed from package.json until then.",
+  "files": []
+}

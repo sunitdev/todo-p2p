@@ -10,15 +10,15 @@
   --color-label-secondary: #6E6E73;
   --color-label-tertiary: #A1A1A6;
   --color-label-quaternary: #C7C7CC;
-  --color-separator: #0000001A;
+  --color-separator: #0000000E; /* softer hairline per Things3 light reference */
 
-  --color-bg-l1: #F5F5F4;
-  --color-bg-l2: #FAFAFA;
-  --color-bg-l3: #E8E8E6;
+  --color-bg-l1: #F0EEE9; /* warmer sidebar/chrome surface per Things3 light reference */
+  --color-bg-l2: #FBFAF7; /* warm off-white main canvas per Things3 light reference */
+  --color-bg-l3: #E7E4DE; /* warmer row hover per Things3 light reference */
 
-  --color-row-selected: #007AFF;
+  --color-row-selected: #2A7BFF; /* slightly more saturated selection blue per Things3 light reference */
 
-  --color-tint: #007AFF;
+  --color-tint: #2A7BFF; /* match selection — Things3 light reference */
   --color-blue: #3478F6;
   --color-red: #E03E3E;
   --color-orange: #FF9F0A;
@@ -58,6 +58,15 @@
   --text-title--line-height: 26px;
 
   --shadow-ambient: 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  --shadow-elevated: 0 6px 18px rgba(0, 0, 0, 0.10);
+
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --motion-fast: 120ms;
+  --motion-base: 200ms;
+  --motion-slow: 320ms;
+  --motion-check: 180ms;
+  --motion-row-out: 200ms;
+  --motion-row-hold: 500ms;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -88,6 +97,7 @@
     --color-gray: #98989D;
 
     --shadow-ambient: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
+    --shadow-elevated: 0 8px 24px rgba(0, 0, 0, 0.55);
   }
 }
 
@@ -110,4 +120,64 @@
   .row-hover { @apply hover:bg-bg-l3; }
   .row-selected { @apply bg-[var(--color-row-selected)] text-white; }
   .section-header { @apply text-caption font-semibold uppercase tracking-wider text-label-tertiary; }
+
+  .anim-check-pop {
+    animation: check-pop var(--motion-base) var(--ease-out);
+  }
+  .anim-row-out {
+    animation: row-out var(--motion-row-out) var(--ease-out) forwards;
+  }
+  .anim-fade-in {
+    animation: fade-in var(--motion-fast) var(--ease-out);
+  }
+  .anim-pop-in {
+    animation: pop-in var(--motion-base) var(--ease-out);
+  }
+
+  /*
+   * ProgressIcon arc — transitions stroke-dashoffset on the filled circle so
+   * the ring animates 0..N. Attribute-driven (CSP-safe, no inline style).
+   */
+  .progress-ring {
+    transition: stroke-dashoffset var(--motion-slow) var(--ease-out);
+  }
+}
+
+@keyframes check-pop {
+  0%   { transform: scale(1); }
+  45%  { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+@keyframes row-out {
+  0%   { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-4px); max-height: 0; padding-top: 0; padding-bottom: 0; margin-top: 0; margin-bottom: 0; }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes pop-in {
+  0%   { opacity: 0; transform: scale(0.96); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  @theme {
+    --motion-fast: 0ms;
+    --motion-base: 0ms;
+    --motion-slow: 0ms;
+    --motion-check: 0ms;
+    --motion-row-out: 0ms;
+    --motion-row-hold: 0ms;
+  }
+  .anim-check-pop,
+  .anim-row-out,
+  .anim-fade-in,
+  .anim-pop-in {
+    animation: none !important;
+  }
+  *, *::before, *::after {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+  }
 }

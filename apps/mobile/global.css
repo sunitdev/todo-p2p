@@ -1,0 +1,4 @@
+/* NativeWind v4 entrypoint. Loaded by metro.config.js. */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
