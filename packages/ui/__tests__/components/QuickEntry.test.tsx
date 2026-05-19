@@ -156,11 +156,10 @@ describe('QuickEntry', () => {
     expect((onSave.mock.calls[0]?.[0] as TodoInput).notes).toBe('context here');
   });
 
-  test('toolbar pills (When/List/Tags) are rendered', () => {
+  test('toolbar pills (When/List) are rendered', () => {
     setup();
     expect(screen.getByRole('button', { name: 'When' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'List' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Tags' })).toBeInTheDocument();
   });
 
   test('clicking the When pill opens the DatePicker popover', async () => {

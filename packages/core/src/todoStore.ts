@@ -16,8 +16,6 @@ export interface Todo {
   done: boolean;
   createdAt: number;
   completedAt?: number;
-  /** @deprecated Free-text tags. New code should use `tagIds` against `tags` collection. */
-  tags?: string[];
   projectId?: string | null;
   areaId?: string | null;
   notes?: string;
@@ -32,8 +30,6 @@ export interface Todo {
   eveningOnToday?: boolean;
   /** Project-scoped heading the todo lives under. */
   headingId?: string | null;
-  /** Many-to-many tag association by `Tag.id`. */
-  tagIds?: string[];
 }
 
 export type IconRef =
@@ -84,15 +80,6 @@ export interface Heading {
   updatedAt: number;
 }
 
-/** User-defined coloured chip; many-to-many with todos via `Todo.tagIds`. */
-export interface Tag {
-  id: string;
-  name: string;
-  color: PaletteColor;
-  createdAt: number;
-  updatedAt: number;
-}
-
 export interface TodoDoc {
   todos: Record<string, Todo>;
   order: string[];
@@ -102,8 +89,6 @@ export interface TodoDoc {
   projectOrder: string[];
   headings: Record<string, Heading>;
   headingOrder: string[];
-  tags: Record<string, Tag>;
-  tagOrder: string[];
   meta: { schemaVersion: number };
 }
 
@@ -123,11 +108,6 @@ export type HeadingInput = {
   /** Optional; appended at end of project's headings when omitted. */
   order?: number;
 };
-export type TagInput = {
-  id: string;
-  name: string;
-  color: PaletteColor;
-};
 
 export class TodoStore {
   private doc: Automerge.Doc<TodoDoc>;
@@ -146,8 +126,6 @@ export class TodoStore {
       d.projectOrder = [];
       d.headings = {};
       d.headingOrder = [];
-      d.tags = {};
-      d.tagOrder = [];
       d.meta = { schemaVersion: CURRENT_SCHEMA_VERSION };
     });
     return new TodoStore(doc);
@@ -172,7 +150,6 @@ export class TodoStore {
         done: false,
         createdAt: Date.now(),
       };
-      if (input.tags !== undefined) todo.tags = input.tags;
       if (input.projectId !== undefined) todo.projectId = input.projectId;
       if (input.areaId !== undefined) todo.areaId = input.areaId;
       if (input.notes !== undefined) todo.notes = input.notes;
@@ -183,7 +160,6 @@ export class TodoStore {
       if (input.recurrence !== undefined) todo.recurrence = { ...input.recurrence };
       if (input.eveningOnToday !== undefined) todo.eveningOnToday = input.eveningOnToday;
       if (input.headingId !== undefined) todo.headingId = input.headingId;
-      if (input.tagIds !== undefined) todo.tagIds = [...input.tagIds];
       d.todos[input.id] = todo;
       d.order.push(input.id);
     });
@@ -197,7 +173,6 @@ export class TodoStore {
       Pick<
         Todo,
         | "title"
-        | "tags"
         | "projectId"
         | "areaId"
         | "notes"
@@ -208,7 +183,6 @@ export class TodoStore {
         | "recurrence"
         | "eveningOnToday"
         | "headingId"
-        | "tagIds"
       >
     >,
   ): Uint8Array {
@@ -217,7 +191,6 @@ export class TodoStore {
       const t = d.todos[id];
       if (!t) return;
       if (patch.title !== undefined) t.title = patch.title;
-      if (patch.tags !== undefined) t.tags = patch.tags;
       if (patch.projectId !== undefined) t.projectId = patch.projectId;
       if (patch.areaId !== undefined) t.areaId = patch.areaId;
       if (patch.notes !== undefined) {
@@ -231,8 +204,6 @@ export class TodoStore {
       if (patch.recurrence !== undefined) t.recurrence = { ...patch.recurrence };
       if (patch.eveningOnToday !== undefined) t.eveningOnToday = patch.eveningOnToday;
       if (patch.headingId !== undefined) t.headingId = patch.headingId;
-      // Replace whole array — caller-side merging avoids Automerge list-edit churn.
-      if (patch.tagIds !== undefined) t.tagIds = [...patch.tagIds];
     });
     return lastChange(before, this.doc);
   }
@@ -383,11 +354,7 @@ export class TodoStore {
   }
 
   // ───────────────────────────────────────────────────────────────────────────
-  // region: headings + tags + recurrence (Phase 3 + 7 schema additions)
-  //
-  // Agent B owns this region. Agent A (rows + multi-select) is also extending
-  // this class and will append `reorderTodo`/`bulkUpdate` in a separate region
-  // below; do not interleave methods here.
+  // region: headings + recurrence (Phase 3 + 7 schema additions)
   // ───────────────────────────────────────────────────────────────────────────
 
   addHeading(input: HeadingInput): Uint8Array {
@@ -453,65 +420,7 @@ export class TodoStore {
     return this.doc.headings[id];
   }
 
-  addTag(input: TagInput): Uint8Array {
-    const before = this.doc;
-    this.doc = Automerge.change(before, `tag:add ${input.id}`, (d) => {
-      const now = Date.now();
-      d.tags[input.id] = {
-        id: input.id,
-        name: input.name,
-        color: input.color,
-        createdAt: now,
-        updatedAt: now,
-      };
-      d.tagOrder.push(input.id);
-    });
-    return lastChange(before, this.doc);
-  }
-
-  updateTag(id: string, patch: Partial<Pick<Tag, "name" | "color">>): Uint8Array {
-    const before = this.doc;
-    this.doc = Automerge.change(before, `tag:update ${id}`, (d) => {
-      const tag = d.tags[id];
-      if (!tag) return;
-      if (patch.name !== undefined) tag.name = patch.name;
-      if (patch.color !== undefined) tag.color = patch.color;
-      tag.updatedAt = Date.now();
-    });
-    return lastChange(before, this.doc);
-  }
-
-  /** Removes a tag and strips it from every todo's `tagIds`. */
-  removeTag(id: string): Uint8Array {
-    const before = this.doc;
-    this.doc = Automerge.change(before, `tag:remove ${id}`, (d) => {
-      delete d.tags[id];
-      const idx = d.tagOrder.indexOf(id);
-      if (idx >= 0) d.tagOrder.splice(idx, 1);
-      for (const t of Object.values(d.todos)) {
-        if (!t.tagIds) continue;
-        const i = t.tagIds.indexOf(id);
-        if (i >= 0) t.tagIds.splice(i, 1);
-      }
-    });
-    return lastChange(before, this.doc);
-  }
-
-  listTags(): Tag[] {
-    return this.doc.tagOrder
-      .map((id) => this.doc.tags[id])
-      .filter((t): t is Tag => t !== undefined);
-  }
-
-  getTag(id: string): Tag | undefined {
-    return this.doc.tags[id];
-  }
-
   // ── Filter helpers (read-only views over the current snapshot) ────────────
-
-  getTodosByTag(tagId: string): Todo[] {
-    return this.list().filter((t) => t.tagIds?.includes(tagId) ?? false);
-  }
 
   getTodosByHeading(headingId: string): Todo[] {
     return this.list().filter((t) => t.headingId === headingId);
@@ -558,7 +467,6 @@ export class TodoStore {
       Pick<
         Todo,
         | "title"
-        | "tags"
         | "projectId"
         | "areaId"
         | "notes"
@@ -577,7 +485,6 @@ export class TodoStore {
         if (!t) continue;
         touched = true;
         if (patch.title !== undefined) t.title = patch.title;
-        if (patch.tags !== undefined) t.tags = patch.tags;
         if (patch.projectId !== undefined) t.projectId = patch.projectId;
         if (patch.areaId !== undefined) t.areaId = patch.areaId;
         if (patch.notes !== undefined) {

@@ -5,7 +5,6 @@ import {
   Flag,
   Repeat,
   Sun,
-  Tag,
   Trash2,
 } from 'lucide-react';
 import { ContextMenu, type ContextMenuItem } from './ContextMenu';
@@ -16,14 +15,13 @@ export type RowContextAction =
   | 'schedule'
   | 'move'
   | 'when'
-  | 'tags'
   | 'repeat'
   | 'delete';
 
 /**
  * Wraps `ContextMenu` with the canonical Things3 row-action set. The action
  * names match the per-row context menu in Things; placeholders that aren't
- * wired yet (`schedule`, `move`, `when`, `tags`, `repeat`) still emit a
+ * wired yet (`schedule`, `move`, `when`, `repeat`) still emit a
  * callback so the parent can route them to Wave 2 work.
  *
  * When the row that triggered the menu is part of a multi-select, the parent
@@ -73,11 +71,6 @@ export function RowContextMenu({
       label: 'Move to…',
       icon: <ArrowRight className="size-3.5" />,
       onSelect: () => onAction('move'),
-    },
-    {
-      label: 'Tags…',
-      icon: <Tag className="size-3.5" />,
-      onSelect: () => onAction('tags'),
     },
     {
       label: 'Repeat…',

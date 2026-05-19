@@ -18,7 +18,6 @@ export type DropTargetKind =
   | 'sidebar-section'
   | 'sidebar-project'
   | 'sidebar-area'
-  | 'sidebar-tag'
   | 'row-above'
   | 'row-below';
 

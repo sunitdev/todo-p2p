@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
-import { App, ErrorScreen, Splash, hasWebTransport } from '../src/App';
+import { App, ErrorScreen, Splash, hasWebTransport, isTauri } from '../src/App';
 
 afterEach(cleanup);
 
@@ -31,6 +31,20 @@ describe('hasWebTransport feature-detect', () => {
   });
 });
 
+describe('isTauri runtime-detect', () => {
+  test('returns false when __TAURI_INTERNALS__ is absent', () => {
+    expect(isTauri({})).toBe(false);
+  });
+
+  test('returns false when __TAURI_INTERNALS__ is null', () => {
+    expect(isTauri({ __TAURI_INTERNALS__: null })).toBe(false);
+  });
+
+  test('returns true when __TAURI_INTERNALS__ is injected', () => {
+    expect(isTauri({ __TAURI_INTERNALS__: {} })).toBe(true);
+  });
+});
+
 describe('App routing on unsupported browser', () => {
   let originalWT: unknown;
   beforeEach(() => {
@@ -52,5 +66,21 @@ describe('App routing on unsupported browser', () => {
     );
     // Splash must not remain mounted.
     expect(screen.queryByText(/Opening secure store/)).toBeNull();
+  });
+
+  test('bypasses WebTransport gate under Tauri runtime', async () => {
+    const g = globalThis as { __TAURI_INTERNALS__?: unknown };
+    const originalTauri = g.__TAURI_INTERNALS__;
+    g.__TAURI_INTERNALS__ = {};
+    try {
+      render(<App />);
+      // Engine init proceeds; Unsupported never mounts.
+      await waitFor(() => {
+        expect(screen.queryByText('Browser not supported')).toBeNull();
+      });
+    } finally {
+      if (originalTauri === undefined) delete g.__TAURI_INTERNALS__;
+      else g.__TAURI_INTERNALS__ = originalTauri;
+    }
   });
 });

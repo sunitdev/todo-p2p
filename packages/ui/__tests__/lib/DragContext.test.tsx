@@ -86,8 +86,8 @@ describe('DragContext.registerTarget / resolveAt', () => {
   test('unregister removes the entry — subsequent resolveAt is null', () => {
     const ctx = setupCtx();
     const t: DropTarget = {
-      id: 'tag-1',
-      kind: 'sidebar-tag',
+      id: 'area-1',
+      kind: 'sidebar-area',
       rect: fakeRect(0, 0, 100, 100),
     };
     const unreg = ctx.registerTarget(t);

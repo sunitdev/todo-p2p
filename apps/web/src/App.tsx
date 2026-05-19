@@ -68,6 +68,17 @@ export function hasWebTransport(globalRef: unknown = globalThis): boolean {
   return typeof g.WebTransport === 'function';
 }
 
+/**
+ * Tauri desktop loads this same web bundle inside WKWebView/WebView2, which
+ * lacks WebTransport on macOS. Desktop runs iroh natively via Rust, so the
+ * WebTransport gate must not apply. Detect Tauri via the injected internals
+ * global. Exported for tests.
+ */
+export function isTauri(globalRef: unknown = globalThis): boolean {
+  const g = globalRef as { __TAURI_INTERNALS__?: unknown };
+  return g.__TAURI_INTERNALS__ != null;
+}
+
 export function App() {
   const [state, setState] = useState<State>({ kind: 'loading' });
   const [route, setRoute] = useState<Route>('home');
@@ -75,7 +86,7 @@ export function App() {
   useTauriQuickEntryBridge();
 
   useEffect(() => {
-    if (!hasWebTransport()) {
+    if (!isTauri() && !hasWebTransport()) {
       setState({ kind: 'unsupported' });
       setRoute('unsupported');
       return;

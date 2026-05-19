@@ -15,8 +15,6 @@ import type {
   Project,
   ProjectInput,
   SyncEngine,
-  Tag,
-  TagInput,
   Todo,
 } from '@todo-p2p/core';
 import { newId } from './id';
@@ -25,7 +23,6 @@ export type TodoPatch = Partial<
   Pick<
     Todo,
     | 'title'
-    | 'tags'
     | 'projectId'
     | 'areaId'
     | 'notes'
@@ -36,7 +33,6 @@ export type TodoPatch = Partial<
     | 'recurrence'
     | 'eveningOnToday'
     | 'headingId'
-    | 'tagIds'
   >
 >;
 
@@ -49,7 +45,6 @@ export interface StoreValue {
   areas: Area[];
   projects: Project[];
   headings: Heading[];
-  tags: Tag[];
 
   addTodo(input: TodoInput): Promise<void>;
   updateTodo(id: string, patch: TodoPatch): Promise<void>;
@@ -74,10 +69,6 @@ export interface StoreValue {
     patch: Partial<Pick<Heading, 'title' | 'order' | 'projectId'>>,
   ): Promise<void>;
   removeHeading(id: string): Promise<void>;
-
-  addTag(input: TagInput): Promise<void>;
-  updateTag(id: string, patch: Partial<Pick<Tag, 'name' | 'color'>>): Promise<void>;
-  removeTag(id: string): Promise<void>;
 }
 
 const StoreCtx = createContext<StoreValue | null>(null);
@@ -119,7 +110,6 @@ export function StoreProvider({
       areas: store.listAreas(),
       projects: store.listProjects(),
       headings: store.listHeadings(),
-      tags: store.listTags(),
 
       addTodo: ({ id, ...rest }) => commit(store.add({ id: id ?? newId(), ...rest })),
       updateTodo: (id, patch) => commit(store.updateTodo(id, patch)),
@@ -144,10 +134,6 @@ export function StoreProvider({
       addHeading: (input) => commit(store.addHeading(input)),
       updateHeading: (id, patch) => commit(store.updateHeading(id, patch)),
       removeHeading: (id) => commit(store.removeHeading(id)),
-
-      addTag: (input) => commit(store.addTag(input)),
-      updateTag: (id, patch) => commit(store.updateTag(id, patch)),
-      removeTag: (id) => commit(store.removeTag(id)),
     };
   }, [store, commit, version]);
 
@@ -163,7 +149,7 @@ export function useStore(): StoreValue {
 /**
  * Non-throwing variant for components that may render outside `<StoreProvider>`
  * (e.g. standalone unit tests for `TodoRow`). Returns `null` when absent so
- * the caller can short-circuit features that need store data (like tag chips).
+ * the caller can short-circuit features that need store data.
  */
 export function useStoreOptional(): StoreValue | null {
   return useContext(StoreCtx);

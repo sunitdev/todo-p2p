@@ -11,10 +11,9 @@ import {
   Plus,
   Search,
   Star,
-  Tag as TagIcon,
   type LucideIcon,
 } from 'lucide-react';
-import type { Area, PaletteColor, Project, Recurrence, Tag, Todo } from '@todo-p2p/core';
+import type { Area, Project, Recurrence, Todo } from '@todo-p2p/core';
 import { cn } from '../lib/cn';
 import { COLOR_TEXT } from '../lib/palette';
 import { getLucide } from '../lib/icons';
@@ -28,8 +27,6 @@ import { QuickEntry, type QuickEntryDefault } from '../components/QuickEntry';
 import { Sidebar, type Selection, type SectionId } from '../components/Sidebar';
 import { AreaForm } from '../components/AreaForm';
 import { ProjectForm } from '../components/ProjectForm';
-import { TagForm } from '../components/TagForm';
-import { TagPicker } from '../components/TagPicker';
 import {
   NewTodoRow,
   type DraftScheduleOverride,
@@ -62,13 +59,9 @@ const SECTION_META: Record<SectionId, SectionMeta> = {
 function deriveScheduleHint(
   selection: Selection,
   selectedProject: Project | null,
-  selectedTag: Tag | null,
 ): ScheduleHint {
   if (selection.kind === 'project' && selectedProject) {
     return { label: selectedProject.title, icon: Inbox, tint: 'text-blue' };
-  }
-  if (selection.kind === 'tag' && selectedTag) {
-    return { label: selectedTag.name, icon: TagIcon, tint: COLOR_TEXT[selectedTag.color] };
   }
   const id = (selection as { kind: 'section'; id: SectionId }).id;
   const meta = SECTION_META[id];
@@ -80,20 +73,15 @@ function deriveScheduleHint(
 function deriveRowTint(
   selection: Selection,
   selectedProject: Project | null,
-  selectedTag: Tag | null,
 ): string {
   if (selection.kind === 'project' && selectedProject) {
     return COLOR_TEXT[selectedProject.color];
-  }
-  if (selection.kind === 'tag' && selectedTag) {
-    return COLOR_TEXT[selectedTag.color];
   }
   return SECTION_META[(selection as { kind: 'section'; id: SectionId }).id].tint;
 }
 
 function defaultsForDraft(selection: Selection): TodoInput {
   if (selection.kind === 'project') return { title: '', projectId: selection.id };
-  if (selection.kind === 'tag') return { title: '', tagIds: [selection.id] };
   switch (selection.id) {
     case 'today':
       return { title: '', scheduledWhen: 'today' };
@@ -127,8 +115,6 @@ export function buildMagicPlusInput(
       return { id: newTodoId, title: 'New To-Do', projectId: payload.targetId };
     case 'sidebar-area':
       return { id: newTodoId, title: 'New To-Do', areaId: payload.targetId };
-    case 'sidebar-tag':
-      return { id: newTodoId, title: 'New To-Do', tagIds: [payload.targetId] };
     case 'row-above':
     case 'row-below':
       return {
@@ -168,9 +154,7 @@ type RowMenuState = {
   todoId: string;
 };
 
-type PickerKind = 'date' | 'recurrence' | 'tags';
-
-type TagModal = { mode: 'create' } | { mode: 'edit'; tag: Tag };
+type PickerKind = 'date' | 'recurrence';
 
 /**
  * Active picker popover. `target` is either an existing todo id or the
@@ -298,7 +282,6 @@ export function Home() {
   const [picker, setPicker] = useState<PickerState | null>(null);
   const [areaModal, setAreaModal] = useState<AreaModal | null>(null);
   const [projectModal, setProjectModal] = useState<ProjectModal | null>(null);
-  const [tagModal, setTagModal] = useState<TagModal | null>(null);
   // Inline "Add Heading" affordance at the bottom of a project view. Holds the
   // title draft so Enter/blur know what to commit. Null = button not yet clicked.
   const [headingDraft, setHeadingDraft] = useState<string | null>(null);
@@ -324,22 +307,9 @@ export function Home() {
     [selection, store.projects],
   );
 
-  const selectedTag = useMemo(
-    () =>
-      selection.kind === 'tag'
-        ? store.tags.find((t) => t.id === selection.id) ?? null
-        : null,
-    [selection, store.tags],
-  );
-
   const visible = useMemo<Todo[]>(() => {
     if (selection.kind === 'project') {
       return store.todos.filter((t) => t.projectId === selection.id);
-    }
-    if (selection.kind === 'tag') {
-      return store.todos.filter(
-        (t) => !t.done && (t.tagIds?.includes(selection.id) ?? false),
-      );
     }
     const all = store.todos;
     switch (selection.id) {
@@ -378,8 +348,8 @@ export function Home() {
   }, [visible, expandedId]);
 
   const rowTint = useMemo(
-    () => deriveRowTint(selection, selectedProject, selectedTag),
-    [selection, selectedProject, selectedTag],
+    () => deriveRowTint(selection, selectedProject),
+    [selection, selectedProject],
   );
 
   /**
@@ -410,24 +380,8 @@ export function Home() {
   );
 
   const scheduleHint = useMemo<ScheduleHint>(
-    () => deriveScheduleHint(selection, selectedProject, selectedTag),
-    [selection, selectedProject, selectedTag],
-  );
-
-  /** Cache tagged-todo counts so sidebar `tagCount` lookups are O(1). */
-  const tagCountMap = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const t of store.todos) {
-      if (t.done) continue;
-      const ids = t.tagIds;
-      if (!ids) continue;
-      for (const id of ids) counts.set(id, (counts.get(id) ?? 0) + 1);
-    }
-    return counts;
-  }, [store.todos]);
-  const tagCount = useCallback(
-    (id: string) => tagCountMap.get(id) ?? 0,
-    [tagCountMap],
+    () => deriveScheduleHint(selection, selectedProject),
+    [selection, selectedProject],
   );
 
   const startDraft = useCallback(() => {
@@ -625,12 +579,6 @@ export function Home() {
           setPicker({ kind: 'recurrence', target: targetId, anchor });
           break;
         }
-        case 'tags': {
-          const targetId = ids[0];
-          if (!targetId) break;
-          setPicker({ kind: 'tags', target: targetId, anchor });
-          break;
-        }
         case 'move':
         default:
           break;
@@ -773,10 +721,7 @@ export function Home() {
 
   const quickEntryDefault = useMemo<QuickEntryDefault>(() => {
     if (selection.kind === 'project') return { kind: 'project', id: selection.id };
-    if (selection.kind === 'section') return { kind: 'section', id: selection.id };
-    // Tag selection isn't an addressable filing target for QuickEntry — fall
-    // back to Inbox so the picker still pre-fills something sensible.
-    return { kind: 'section', id: 'inbox' };
+    return { kind: 'section', id: selection.id };
   }, [selection]);
 
   const handleDeleteArea = (a: Area) => {
@@ -792,19 +737,6 @@ export function Home() {
     }
     void store.removeProject(p.id);
     if (selection.kind === 'project' && selection.id === p.id) {
-      setSelection({ kind: 'section', id: 'today' });
-    }
-  };
-
-  const handleDeleteTag = (t: Tag) => {
-    if (
-      typeof window !== 'undefined' &&
-      !window.confirm(`Delete tag "${t.name}"? It will be removed from all to-dos.`)
-    ) {
-      return;
-    }
-    void store.removeTag(t.id);
-    if (selection.kind === 'tag' && selection.id === t.id) {
       setSelection({ kind: 'section', id: 'today' });
     }
   };
@@ -844,7 +776,7 @@ export function Home() {
   const projectIsEmpty =
     isProjectView && visible.length === 0 && projectHeadings.length === 0 && !draftId;
   const showSectionPlaceholder =
-    (selection.kind === 'section' || selection.kind === 'tag') &&
+    selection.kind === 'section' &&
     visible.length === 0 &&
     !draftId;
 
@@ -964,9 +896,6 @@ export function Home() {
         case 'sidebar-project':
           setSelection({ kind: 'project', id: payload.targetId });
           break;
-        case 'sidebar-tag':
-          setSelection({ kind: 'tag', id: payload.targetId });
-          break;
       }
 
       void (async () => {
@@ -1021,18 +950,13 @@ export function Home() {
         }}
         areas={store.areas}
         projects={store.projects}
-        tags={store.tags}
         onCreateArea={() => setAreaModal({ mode: 'create' })}
         onCreateProject={(areaId) => setProjectModal({ mode: 'create', areaId })}
-        onCreateTag={() => setTagModal({ mode: 'create' })}
         onEditArea={(area) => setAreaModal({ mode: 'edit', area })}
         onEditProject={(project) => setProjectModal({ mode: 'edit', project })}
-        onEditTag={(tag) => setTagModal({ mode: 'edit', tag })}
         onDeleteArea={handleDeleteArea}
         onDeleteProject={handleDeleteProject}
-        onDeleteTag={handleDeleteTag}
         projectProgress={projectProgress}
-        tagCount={tagCount}
       />
 
       <main className="relative flex flex-1 flex-col overflow-hidden">
@@ -1043,8 +967,6 @@ export function Home() {
                 project={selectedProject}
                 progress={projectProgress(selectedProject.id)}
               />
-            ) : selection.kind === 'tag' && selectedTag ? (
-              <TagHeader tag={selectedTag} />
             ) : (
               <SectionHeader meta={SECTION_META[(selection as { kind: 'section'; id: SectionId }).id]} />
             )}
@@ -1198,50 +1120,6 @@ export function Home() {
         />
       )}
 
-      {picker?.kind === 'tags' && picker.target !== 'draft' && (
-        <TagPicker
-          tags={store.tags}
-          anchor={picker.anchor}
-          value={
-            store.todos.find((x) => x.id === picker.target)?.tagIds ?? []
-          }
-          onChange={(next) => {
-            if (picker.target === 'draft') return;
-            void store.updateTodo(picker.target, { tagIds: next });
-          }}
-          onCreateTag={async (input) => {
-            const id = newId();
-            await store.addTag({ id, ...input });
-            return id;
-          }}
-          onClose={() => setPicker(null)}
-        />
-      )}
-
-      {tagModal?.mode === 'create' && (
-        <TagForm
-          title="New tag"
-          submitLabel="Create"
-          onClose={() => setTagModal(null)}
-          onSubmit={async (res: { name: string; color: PaletteColor }) => {
-            await store.addTag({ id: newId(), ...res });
-            setTagModal(null);
-          }}
-        />
-      )}
-      {tagModal?.mode === 'edit' && (
-        <TagForm
-          title="Edit tag"
-          submitLabel="Save"
-          initial={tagModal.tag}
-          onClose={() => setTagModal(null)}
-          onSubmit={async (res: { name: string; color: PaletteColor }) => {
-            await store.updateTag(tagModal.tag.id, res);
-            setTagModal(null);
-          }}
-        />
-      )}
-
       {areaModal?.mode === 'create' && (
         <AreaForm
           title="New area"
@@ -1319,15 +1197,6 @@ function SectionHeader({ meta }: { meta: SectionMeta }) {
         fill={meta.fill ? 'currentColor' : 'none'}
       />
       <h1 className="text-title font-bold tracking-tight text-label">{meta.title}</h1>
-    </div>
-  );
-}
-
-function TagHeader({ tag }: { tag: Tag }) {
-  return (
-    <div className="flex items-center gap-2.5">
-      <TagIcon className={cn('size-6', COLOR_TEXT[tag.color])} aria-hidden />
-      <h1 className="text-title font-bold tracking-tight text-label">{tag.name}</h1>
     </div>
   );
 }

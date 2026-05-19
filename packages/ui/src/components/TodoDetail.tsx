@@ -4,7 +4,7 @@ import {
   useState,
   type KeyboardEvent,
 } from 'react';
-import { CalendarDays, Flag, Tag, Trash2 } from 'lucide-react';
+import { CalendarDays, Flag, Trash2 } from 'lucide-react';
 import type { Todo } from '@todo-p2p/core';
 import { cn } from '../lib/cn';
 
@@ -14,8 +14,8 @@ import { cn } from '../lib/cn';
  * and edits via `onPatch`; the parent owns persistence (`store.updateTodo`).
  *
  * Esc and clicks outside the card collapse the editor via `onClose`. The
- * pickers for When / Tags / Repeat are placeholder buttons until the date
- * + tag systems land in Wave 2.
+ * pickers for When / Repeat are placeholder buttons until the date system
+ * lands in Wave 2.
  */
 export function TodoDetail({
   todo,
@@ -23,14 +23,12 @@ export function TodoDetail({
   onDelete,
   onClose,
   onOpenWhen,
-  onOpenTags,
 }: {
   todo: Todo;
   onPatch(patch: Partial<Pick<Todo, 'title' | 'notes' | 'flagged'>>): void;
   onDelete(): void;
   onClose(): void;
   onOpenWhen?(): void;
-  onOpenTags?(): void;
 }) {
   const [title, setTitle] = useState(todo.title);
   const [notes, setNotes] = useState(todo.notes ?? '');
@@ -101,7 +99,6 @@ export function TodoDetail({
 
       <div className="mt-2 flex items-center gap-1 border-t border-separator/60 pt-2">
         <MetaBtn icon={<CalendarDays className="size-3.5" />} label="When" onClick={onOpenWhen} />
-        <MetaBtn icon={<Tag className="size-3.5" />} label="Tags" onClick={onOpenTags} />
         <button
           type="button"
           aria-label="Flag"

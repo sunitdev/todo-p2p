@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type MouseEvent } from 'react';
-import { Flag, ListChecks, Tag, type LucideIcon } from 'lucide-react';
+import { Flag, ListChecks, type LucideIcon } from 'lucide-react';
 import type { Recurrence } from '@todo-p2p/core';
 import { cn } from '../lib/cn';
 
@@ -142,7 +142,6 @@ export function NewTodoRow({
             onClick={onOpenSchedule}
           />
           <div className="flex items-center gap-0.5">
-            <IconBtn icon={Tag} label="Tag" />
             <IconBtn icon={ListChecks} label="Checklist" disabled />
             <IconBtn
               icon={Flag}

@@ -5,14 +5,12 @@ export type {
   Area,
   Project,
   Heading,
-  Tag,
   Recurrence,
   IconRef,
   PaletteColor,
   AreaInput,
   ProjectInput,
   HeadingInput,
-  TagInput,
 } from "./todoStore.ts";
 
 export { SyncEngine } from "./syncEngine.ts";

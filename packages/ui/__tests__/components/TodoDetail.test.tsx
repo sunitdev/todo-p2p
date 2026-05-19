@@ -41,7 +41,6 @@ describe('TodoDetail', () => {
     expect(screen.getByLabelText('Title')).toBeInTheDocument();
     expect(screen.getByLabelText('Notes')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'When' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Tags' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Flag' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Done editing/ })).toBeInTheDocument();
   });
@@ -97,15 +96,12 @@ describe('TodoDetail', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  test('When + Tags buttons invoke their optional callbacks', async () => {
+  test('When button invokes its optional callback', async () => {
     const user = userEvent.setup();
     const onOpenWhen = mock();
-    const onOpenTags = mock();
-    setup({ onOpenWhen, onOpenTags });
+    setup({ onOpenWhen });
     await user.click(screen.getByRole('button', { name: 'When' }));
-    await user.click(screen.getByRole('button', { name: 'Tags' }));
     expect(onOpenWhen).toHaveBeenCalledTimes(1);
-    expect(onOpenTags).toHaveBeenCalledTimes(1);
   });
 
   test('unchanged title + notes does not emit a patch', async () => {

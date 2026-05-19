@@ -64,7 +64,7 @@ describe("TodoStore edges", () => {
     s.add({ id: "t1", title: "todo" });
     s.toggle("t1");
     s.toggle("t1");
-    s.updateTodo("t1", { title: "renamed", notes: "n", tags: ["a"] });
+    s.updateTodo("t1", { title: "renamed", notes: "n" });
     s.updateTodo("t1", { notes: "" });
     s.addArea({ id: "a1", name: "A", color: "tint" });
     s.updateArea("a1", { color: "indigo" });

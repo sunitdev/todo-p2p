@@ -16,17 +16,15 @@ import {
   Moon,
   Plus,
   Star,
-  Tag as TagIcon,
   X,
   type LucideIcon,
 } from 'lucide-react';
-import type { PaletteColor, Project, Tag } from '@todo-p2p/core';
+import type { PaletteColor, Project } from '@todo-p2p/core';
 import { cn } from '../lib/cn';
 import { COLOR_BG, COLOR_TEXT } from '../lib/palette';
 import { tween } from '../lib/motion';
 import { useStoreOptional, type TodoInput } from '../lib/store';
 import { DatePicker, type DatePickerValue, type DatePickerWhen } from './DatePicker';
-import { TagPicker } from './TagPicker';
 
 /** A `SectionId`-shaped selection — kept narrow so we don't depend on `Home`'s
  *  ad-hoc routing types. Mirrors `packages/ui/src/components/Sidebar.tsx`. */
@@ -140,13 +138,11 @@ export function QuickEntry({ defaultSelection, onSave, onClose }: QuickEntryProp
   const [notes, setNotes] = useState('');
   const [showNotes, setShowNotes] = useState(false);
   const [list, setList] = useState<ListChoice>(initialList);
-  const [tagIds, setTagIds] = useState<string[]>([]);
   const [schedule, setSchedule] = useState<DatePickerValue>({});
 
   type Picker =
     | { kind: 'when'; anchor: { x: number; y: number } }
-    | { kind: 'list'; anchor: { x: number; y: number } }
-    | { kind: 'tags'; anchor: { x: number; y: number } };
+    | { kind: 'list'; anchor: { x: number; y: number } };
   const [picker, setPicker] = useState<Picker | null>(null);
 
   const panelRef = useRef<HTMLDivElement>(null);
@@ -184,10 +180,9 @@ export function QuickEntry({ defaultSelection, onSave, onClose }: QuickEntryProp
     if (typeof resolved.scheduledFor === 'number') input.scheduledFor = resolved.scheduledFor;
     if (resolved.eveningOnToday) input.eveningOnToday = true;
     if (schedule.recurrence) input.recurrence = schedule.recurrence;
-    if (tagIds.length > 0) input.tagIds = tagIds;
     await onSave(input);
     onClose();
-  }, [title, notes, list, schedule, tagIds, onSave, onClose]);
+  }, [title, notes, list, schedule, onSave, onClose]);
 
   // Esc closes; Cmd/Ctrl+Enter saves. Scoped to the panel (not window) so
   // global shortcuts can't double-fire while the panel is open — the
@@ -211,12 +206,6 @@ export function QuickEntry({ defaultSelection, onSave, onClose }: QuickEntryProp
     [picker, onClose, save],
   );
 
-  const tagSummary = useMemo(() => {
-    if (!store || tagIds.length === 0) return null;
-    const tags = store.tags.filter((t) => tagIds.includes(t.id));
-    return tags;
-  }, [store, tagIds]);
-
   // Click-outside support: tracks panel + any open popover. Pickers render
   // outside this panel's DOM subtree, so we have to exclude them too.
   useEffect(() => {
@@ -226,8 +215,7 @@ export function QuickEntry({ defaultSelection, onSave, onClose }: QuickEntryProp
       if (panelRef.current?.contains(target)) return;
       // Don't dismiss while a child popover is open — it handles its own
       // outside-click via stopPropagation through portal-free placement.
-      const portal = document.querySelector('[data-testid="date-picker"]')
-        ?? document.querySelector('[data-testid="tag-picker"]');
+      const portal = document.querySelector('[data-testid="date-picker"]');
       if (portal && portal.contains(target)) return;
       onClose();
     };
@@ -308,7 +296,6 @@ export function QuickEntry({ defaultSelection, onSave, onClose }: QuickEntryProp
             onClick={(e) => openPicker('when', e)}
           />
           <ListPill list={list} onClick={(e) => openPicker('list', e)} />
-          <TagsPill tags={tagSummary} onClick={(e) => openPicker('tags', e)} />
         </div>
 
         <footer className="flex items-center justify-end gap-2 border-t border-separator/40 px-3 py-2">
@@ -348,24 +335,6 @@ export function QuickEntry({ defaultSelection, onSave, onClose }: QuickEntryProp
           onSelect={(next) => {
             setList(next);
             setPicker(null);
-          }}
-          onClose={() => setPicker(null)}
-        />
-      )}
-
-      {picker?.kind === 'tags' && store && (
-        <TagPicker
-          tags={store.tags}
-          anchor={picker.anchor}
-          value={tagIds}
-          onChange={setTagIds}
-          onCreateTag={async (input) => {
-            // QuickEntry intentionally cannot create persistent tags — the
-            // mainline `Home` route owns that. Create a transient id locally
-            // so the picker UI still toggles it on; the parent's `onSave`
-            // is responsible for materialising any new tag rows.
-            const id = `qe-tmp-${input.name.toLowerCase()}`;
-            return id;
           }}
           onClose={() => setPicker(null)}
         />
@@ -443,49 +412,9 @@ function ListPill({
   );
 }
 
-function TagsPill({
-  tags,
-  onClick,
-}: {
-  tags: Tag[] | null;
-  onClick(e: React.MouseEvent<HTMLButtonElement>): void;
-}) {
-  if (tags && tags.length > 0) {
-    return (
-      <button
-        type="button"
-        aria-label="Tags"
-        onClick={onClick}
-        onMouseDown={(e) => e.preventDefault()}
-        className="inline-flex items-center gap-1.5 rounded-2 px-1.5 py-0.5 text-footnote text-label transition-colors hover:bg-bg-l3"
-      >
-        <TagIcon className="size-3.5 shrink-0 text-label-secondary" aria-hidden />
-        <span className="font-semibold text-label">
-          {tags.length === 1
-            ? tags[0]!.name
-            : `${tags.length} tags`}
-        </span>
-      </button>
-    );
-  }
-  return (
-    <button
-      type="button"
-      aria-label="Tags"
-      onClick={onClick}
-      onMouseDown={(e) => e.preventDefault()}
-      className="inline-flex items-center gap-1.5 rounded-2 px-1.5 py-0.5 text-footnote text-label-secondary transition-colors hover:bg-bg-l3 hover:text-label"
-    >
-      <Plus className="size-3.5 shrink-0" aria-hidden />
-      <span className="font-semibold">Tags</span>
-    </button>
-  );
-}
-
 /**
  * Inline list picker for the "List" toolbar pill. Lists the four fixed
- * sections and any user-defined projects. Mirrors `TagPicker` shell so visual
- * weight stays consistent across the panel's popovers.
+ * sections and any user-defined projects.
  */
 function ListPicker({
   anchor,

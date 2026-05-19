@@ -8,7 +8,7 @@ import {
 } from 'react';
 import { motion } from 'motion/react';
 import { FileText, Flag, RotateCw } from 'lucide-react';
-import type { Tag, Todo } from '@todo-p2p/core';
+import type { Todo } from '@todo-p2p/core';
 import { cn } from '../lib/cn';
 import { duration, easeOut, tween } from '../lib/motion';
 import { useDropTarget } from '../lib/DragContext';
@@ -18,8 +18,6 @@ import {
   formatDueShort,
 } from '../lib/scheduleLabel';
 import { summarizeRecurrence } from './DatePicker';
-import { TagChip } from './TagChip';
-import { useStoreOptional } from '../lib/store';
 
 export type TodoRowClickModifiers = {
   meta: boolean;
@@ -64,12 +62,6 @@ export const TodoRow = forwardRef<HTMLDivElement, TodoRowProps>(function TodoRow
   },
   ref,
 ) {
-  // Tags come from the store so the row is self-contained — `useStoreOptional`
-  // returns null when rendered outside `<StoreProvider>` (e.g. unit tests for
-  // this component) so we degrade to an empty list without crashing.
-  const storeMaybe = useStoreOptional();
-  const tags = storeMaybe?.tags ?? [];
-
   // Track the transition into `done` so the check anim only fires on the flip,
   // not on every re-render (e.g. when a sibling row updates).
   const prevDone = useRef(done);
@@ -182,7 +174,7 @@ export const TodoRow = forwardRef<HTMLDivElement, TodoRowProps>(function TodoRow
           )}
         </button>
 
-        <RowTrail todo={todo} tags={tags} />
+        <RowTrail todo={todo} />
 
         {todo.notes && (
           <FileText className="size-3 shrink-0 text-label-tertiary" aria-hidden />
@@ -226,36 +218,17 @@ export const TodoRow = forwardRef<HTMLDivElement, TodoRowProps>(function TodoRow
  * subdued marker. Colours come from `scheduleLabel.ts` so the source of truth
  * for "Today/Tomorrow/overdue" lives in one place.
  */
-function RowTrail({ todo, tags }: { todo: Todo; tags: Tag[] }) {
+function RowTrail({ todo }: { todo: Todo }) {
   const pill = deriveSchedulePill(todo);
   const deadline = deriveDeadline(todo);
   const recurrence = todo.recurrence;
   const dueLabel =
     typeof todo.dueDate === 'number' ? formatDueShort(todo.dueDate) : null;
 
-  // Resolve tag-ids → Tag in the store's display order. Cap at 3 chips; any
-  // surplus becomes a `+N` plain-text counter so the trail width stays bounded.
-  const ids = todo.tagIds ?? [];
-  const idSet = new Set(ids);
-  const visibleTags = ids.length === 0 ? [] : tags.filter((t) => idSet.has(t.id));
-  const shownTags = visibleTags.slice(0, 3);
-  const overflow = visibleTags.length - shownTags.length;
-
-  if (!pill && !deadline && !recurrence && shownTags.length === 0) return null;
+  if (!pill && !deadline && !recurrence) return null;
 
   return (
     <div className="flex shrink-0 items-center gap-1.5">
-      {shownTags.map((t) => (
-        <TagChip key={t.id} tag={t} />
-      ))}
-      {overflow > 0 && (
-        <span
-          data-testid="tag-overflow"
-          className="text-footnote text-label-tertiary tabular-nums"
-        >
-          +{overflow}
-        </span>
-      )}
       {deadline === 'overdue' && dueLabel && (
         <span
           className="inline-flex items-center gap-0.5 text-footnote text-red tabular-nums"

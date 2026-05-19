@@ -10,7 +10,6 @@ const ALL_LABELS = [
   /When…/,
   /Schedule…/,
   /Move to…/,
-  /Tags…/,
   /Repeat…/,
   /Delete/,
 ];

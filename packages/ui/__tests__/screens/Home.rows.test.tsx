@@ -518,15 +518,6 @@ describe('Home — Magic Plus mount + wiring', () => {
     expect(input.title).toBe('New To-Do');
   });
 
-  test('buildMagicPlusInput on a sidebar-tag drop puts the id into tagIds', () => {
-    const input = buildMagicPlusInput(
-      { kind: 'sidebar-tag', targetId: 'tag-1' },
-      'new-4',
-      null,
-    );
-    expect(input.tagIds).toEqual(['tag-1']);
-  });
-
   test('buildMagicPlusInput on a sidebar-area drop sets areaId', () => {
     const input = buildMagicPlusInput(
       { kind: 'sidebar-area', targetId: 'area-1' },
@@ -600,44 +591,5 @@ describe('Home — Quick Entry (Cmd+Space)', () => {
     expect(
       screen.getByRole('dialog', { name: 'Quick Entry' }),
     ).toBeInTheDocument();
-  });
-});
-
-describe('Home — tag selection + tag picker', () => {
-  test('selecting a tag filters visible todos to that tagId', () => {
-    renderHome((e) => {
-      e.injectRemote('seed', e.todos().addTag({ id: 'tg1', name: 'Focus', color: 'purple' }));
-      e.injectRemote(
-        'seed',
-        e.todos().add({ id: 'a', title: 'Tagged item', tagIds: ['tg1'] }),
-      );
-      e.injectRemote(
-        'seed',
-        e.todos().add({ id: 'b', title: 'Untagged item' }),
-      );
-    });
-    fireEvent.click(screen.getByRole('button', { name: /Focus/ }));
-    expect(screen.getByText('Tagged item')).toBeInTheDocument();
-    expect(screen.queryByText('Untagged item')).toBeNull();
-  });
-
-  test('right-click → Tags… → picking a tag writes tagIds via updateTodo', async () => {
-    const user = userEvent.setup();
-    const { engine } = renderHome((e) => {
-      e.injectRemote('seed', e.todos().addTag({ id: 'tg1', name: 'Focus', color: 'purple' }));
-      e.injectRemote(
-        'seed',
-        e.todos().add({ id: 't1', title: 'Pick me' }),
-      );
-    });
-    await selectInbox();
-    fireEvent.contextMenu(screen.getByText('Pick me'));
-    await user.click(screen.getByRole('menuitem', { name: /Tags…/ }));
-    const picker = screen.getByTestId('tag-picker');
-    expect(picker).toBeInTheDocument();
-    await act(async () => {
-      await user.click(within(picker).getByRole('option', { name: /Focus/ }));
-    });
-    expect(engine.todos().get('t1')?.tagIds).toEqual(['tg1']);
   });
 });

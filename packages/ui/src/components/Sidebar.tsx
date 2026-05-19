@@ -15,7 +15,7 @@ import {
   Trash2,
   type LucideIcon,
 } from 'lucide-react';
-import type { Area, Project, Tag } from '@todo-p2p/core';
+import type { Area, Project } from '@todo-p2p/core';
 import { cn } from '../lib/cn';
 import { COLOR_BG } from '../lib/palette';
 import { getLucide } from '../lib/icons';
@@ -28,8 +28,7 @@ export type SectionId = 'inbox' | 'today' | 'upcoming' | 'anytime' | 'someday' |
 
 export type Selection =
   | { kind: 'section'; id: SectionId }
-  | { kind: 'project'; id: string }
-  | { kind: 'tag'; id: string };
+  | { kind: 'project'; id: string };
 
 type FixedSection = {
   id: SectionId;
@@ -63,41 +62,30 @@ export function Sidebar({
   onSelect,
   areas,
   projects,
-  tags = [],
   onCreateArea,
   onCreateProject,
-  onCreateTag,
   onEditArea,
   onEditProject,
-  onEditTag,
   onDeleteArea,
   onDeleteProject,
-  onDeleteTag,
   projectProgress,
-  tagCount,
 }: {
   selection: Selection;
   onSelect(s: Selection): void;
   areas: Area[];
   projects: Project[];
-  tags?: Tag[];
   onCreateArea(): void;
   onCreateProject(areaId: string | null): void;
-  onCreateTag?(): void;
   onEditArea(a: Area): void;
   onEditProject(p: Project): void;
-  onEditTag?(t: Tag): void;
   onDeleteArea(a: Area): void;
   onDeleteProject(p: Project): void;
-  onDeleteTag?(t: Tag): void;
   /**
    * Per-project completion 0..1. Computed by the screen owner (which has store
    * access). Defaults to 0 when absent so the sidebar can render without a
    * progress map in tests / stories.
    */
   projectProgress?: (projectId: string) => number;
-  /** Tagged-todo counts. Caller computes from `store.todos`; defaults to 0. */
-  tagCount?: (tagId: string) => number;
 }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [menu, setMenu] = useState<MenuState | null>(null);
@@ -146,14 +134,6 @@ export function Sidebar({
         { label: 'Delete area', icon: <Trash2 className="size-3.5" />, destructive: true, onSelect: () => onDeleteArea(a) },
       ],
     });
-  };
-
-  const showTagMenu = (x: number, y: number, t: Tag) => {
-    if (!onEditTag && !onDeleteTag) return;
-    const items: ContextMenuItem[] = [];
-    if (onEditTag) items.push({ label: 'Edit tag', icon: <Pencil className="size-3.5" />, onSelect: () => onEditTag(t) });
-    if (onDeleteTag) items.push({ label: 'Delete tag', icon: <Trash2 className="size-3.5" />, destructive: true, onSelect: () => onDeleteTag(t) });
-    setMenu({ x, y, items });
   };
 
   return (
@@ -253,15 +233,6 @@ export function Sidebar({
           </div>
         )}
       </div>
-
-      <TagSection
-        tags={tags}
-        selection={selection}
-        onSelect={onSelect}
-        onCreateTag={onCreateTag}
-        onMenu={showTagMenu}
-        tagCount={tagCount}
-      />
 
       <div className="mt-auto flex items-center justify-between border-t border-separator px-3 py-2">
         <button
@@ -452,96 +423,6 @@ function ProjectRow({
         <MoreHorizontal className="size-3" />
       </button>
     </div>
-  );
-}
-
-function TagSection({
-  tags,
-  selection,
-  onSelect,
-  onCreateTag,
-  onMenu,
-  tagCount,
-}: {
-  tags: Tag[];
-  selection: Selection;
-  onSelect(s: Selection): void;
-  onCreateTag: (() => void) | undefined;
-  onMenu(x: number, y: number, t: Tag): void;
-  tagCount: ((tagId: string) => number) | undefined;
-}) {
-  if (tags.length === 0 && !onCreateTag) return null;
-  return (
-    <div className="mt-5 px-2">
-      <div className="section-header flex items-center justify-between px-2 pb-1">
-        <span>Tags</span>
-        {onCreateTag && (
-          <button
-            onClick={onCreateTag}
-            aria-label="New tag"
-            className="inline-flex size-5 items-center justify-center rounded-1 text-label-tertiary hover:bg-bg-l3 hover:text-label"
-          >
-            <Plus className="size-3" />
-          </button>
-        )}
-      </div>
-      {tags.length === 0 ? (
-        <div className="px-2 py-1 text-footnote text-label-tertiary">No tags yet</div>
-      ) : (
-        <div className="flex flex-col gap-0.5">
-          {tags.map((t) => (
-            <TagRow
-              key={t.id}
-              tag={t}
-              active={selection.kind === 'tag' && selection.id === t.id}
-              count={tagCount?.(t.id) ?? 0}
-              onClick={() => onSelect({ kind: 'tag', id: t.id })}
-              onMenu={(x, y) => onMenu(x, y, t)}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function TagRow({
-  tag,
-  active,
-  count,
-  onClick,
-  onMenu,
-}: {
-  tag: Tag;
-  active: boolean;
-  count: number;
-  onClick(): void;
-  onMenu(x: number, y: number): void;
-}) {
-  const { ref, isActive } = useDropTarget(tag.id, 'sidebar-tag');
-  return (
-    <button
-      ref={ref}
-      onClick={onClick}
-      onContextMenu={(e) => {
-        e.preventDefault();
-        onMenu(e.clientX, e.clientY);
-      }}
-      aria-current={active ? 'page' : undefined}
-      data-drop-active={isActive ? 'true' : undefined}
-      className={cn(
-        'group flex h-7 items-center gap-2.5 rounded-2 px-2 text-callout transition-colors',
-        active ? 'row-selected' : 'text-label hover:bg-bg-l3',
-        isActive && 'ring-2 ring-tint',
-      )}
-    >
-      <span className={cn('size-2 shrink-0 rounded-full', COLOR_BG[tag.color])} />
-      <span className="flex-1 truncate text-left">{tag.name}</span>
-      <SidebarCount
-        value={count}
-        className={active ? 'text-white/80' : 'text-label-tertiary'}
-      />
-    </button>
   );
 }
 

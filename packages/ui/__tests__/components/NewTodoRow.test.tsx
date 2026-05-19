@@ -48,7 +48,6 @@ describe('NewTodoRow', () => {
     expect(screen.getByPlaceholderText('New To-Do')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Notes')).toBeInTheDocument();
     expect(screen.getByText('Today')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Tag' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Checklist' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Flag' })).toBeInTheDocument();
   });
@@ -67,13 +66,6 @@ describe('NewTodoRow', () => {
   test('Checklist button is disabled', () => {
     setup();
     expect(screen.getByRole('button', { name: 'Checklist' })).toBeDisabled();
-  });
-
-  test('Tag button click does not call onCommit', async () => {
-    const user = userEvent.setup();
-    const { onCommit } = setup();
-    await user.click(screen.getByRole('button', { name: 'Tag' }));
-    expect(onCommit).not.toHaveBeenCalled();
   });
 
   test('Flag button toggles aria-pressed and tint class', async () => {

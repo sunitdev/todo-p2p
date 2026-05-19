@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, mock } from 'bun:test';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import type { Area, Project, Tag } from '@todo-p2p/core';
+import type { Area, Project } from '@todo-p2p/core';
 import { Sidebar } from '../../src/components/Sidebar';
 
 afterEach(cleanup);
@@ -162,88 +162,5 @@ describe('Sidebar', () => {
     expect(screen.getByRole('menuitem', { name: /New project in area/ })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: /Edit area/ })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: /Delete area/ })).toBeInTheDocument();
-  });
-});
-
-function tagFx(overrides: Partial<Tag> = {}): Tag {
-  return {
-    id: 't1',
-    name: 'Focus',
-    color: 'purple',
-    createdAt: 0,
-    updatedAt: 0,
-    ...overrides,
-  };
-}
-
-describe('Sidebar — Tags section', () => {
-  test('TAGS heading + rows render when tags non-empty', () => {
-    render(
-      <Sidebar
-        {...baseProps}
-        tags={[tagFx({ id: 't1', name: 'Focus' }), tagFx({ id: 't2', name: 'Errand', color: 'green' })]}
-      />,
-    );
-    expect(screen.getByText('Tags')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Focus/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Errand/ })).toBeInTheDocument();
-  });
-
-  test('clicking a tag fires onSelect({ kind:"tag", id })', () => {
-    const onSelect = mock();
-    render(
-      <Sidebar
-        {...baseProps}
-        onSelect={onSelect}
-        tags={[tagFx({ id: 't1', name: 'Focus' })]}
-      />,
-    );
-    fireEvent.click(screen.getByRole('button', { name: /Focus/ }));
-    expect(onSelect).toHaveBeenCalledWith({ kind: 'tag', id: 't1' });
-  });
-
-  test('selected tag row carries aria-current=page', () => {
-    render(
-      <Sidebar
-        {...baseProps}
-        selection={{ kind: 'tag', id: 't1' }}
-        tags={[tagFx({ id: 't1', name: 'Focus' })]}
-      />,
-    );
-    expect(screen.getByRole('button', { name: /Focus/ }).getAttribute('aria-current')).toBe('page');
-  });
-
-  test('"New tag" button fires onCreateTag', () => {
-    const onCreateTag = mock();
-    render(<Sidebar {...baseProps} onCreateTag={onCreateTag} tags={[tagFx()]} />);
-    fireEvent.click(screen.getByRole('button', { name: 'New tag' }));
-    expect(onCreateTag).toHaveBeenCalledTimes(1);
-  });
-
-  test('right-click on tag row opens Edit/Delete menu', () => {
-    const onEditTag = mock();
-    const onDeleteTag = mock();
-    render(
-      <Sidebar
-        {...baseProps}
-        onEditTag={onEditTag}
-        onDeleteTag={onDeleteTag}
-        tags={[tagFx({ id: 't1', name: 'Focus' })]}
-      />,
-    );
-    fireEvent.contextMenu(screen.getByRole('button', { name: /Focus/ }));
-    expect(screen.getByRole('menuitem', { name: /Edit tag/ })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: /Delete tag/ })).toBeInTheDocument();
-  });
-
-  test('renders tag counts when tagCount returns positive values', () => {
-    render(
-      <Sidebar
-        {...baseProps}
-        tags={[tagFx({ id: 't1', name: 'Focus' })]}
-        tagCount={(id) => (id === 't1' ? 4 : 0)}
-      />,
-    );
-    expect(screen.getByText('4')).toBeInTheDocument();
   });
 });

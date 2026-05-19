@@ -1,9 +1,7 @@
 import { afterEach, describe, expect, mock, test } from 'bun:test';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { Todo } from '@todo-p2p/core';
 import { TodoRow } from '../../src/components/TodoRow';
-import { StoreProvider } from '../../src/lib/store';
-import { FakeEngine } from '../helpers/fakeEngine';
 
 afterEach(cleanup);
 
@@ -298,59 +296,5 @@ describe('TodoRow', () => {
     );
     fireEvent.contextMenu(screen.getByTestId('todo-row-a'));
     expect(onContextMenu).toHaveBeenCalledTimes(1);
-  });
-});
-
-function renderWithTags(t: Todo, seed: { id: string; name: string; color: 'tint' | 'blue' | 'red' | 'orange' | 'yellow' | 'green' | 'teal' | 'indigo' | 'purple' | 'pink' | 'tan' | 'gray' }[]) {
-  const engine = new FakeEngine();
-  act(() => {
-    for (const s of seed) {
-      engine.injectRemote('seed', engine.todos().addTag({ id: s.id, name: s.name, color: s.color }));
-    }
-  });
-  return render(
-    <StoreProvider engine={engine.asEngine()}>
-      <TodoRow todo={t} done={false} tint="text-blue" onToggle={NOOP} />
-    </StoreProvider>,
-  );
-}
-
-describe('TodoRow — tag chips', () => {
-  test('no chips when todo.tagIds is empty/undefined', () => {
-    renderWithTags(
-      { id: 'a', title: 'Walk', done: false, createdAt: 0 },
-      [{ id: 't1', name: 'Focus', color: 'purple' }],
-    );
-    expect(screen.queryByTestId('tag-chip-t1')).toBeNull();
-  });
-
-  test('renders chip for each matching tag id', () => {
-    renderWithTags(
-      { id: 'a', title: 'Walk', done: false, createdAt: 0, tagIds: ['t1', 't2'] },
-      [
-        { id: 't1', name: 'Focus', color: 'purple' },
-        { id: 't2', name: 'Errand', color: 'green' },
-      ],
-    );
-    expect(screen.getByTestId('tag-chip-t1')).toHaveTextContent('Focus');
-    expect(screen.getByTestId('tag-chip-t2')).toHaveTextContent('Errand');
-  });
-
-  test('caps at 3 chips and shows +N counter for overflow', () => {
-    renderWithTags(
-      { id: 'a', title: 'Walk', done: false, createdAt: 0, tagIds: ['t1', 't2', 't3', 't4', 't5'] },
-      [
-        { id: 't1', name: 'A', color: 'purple' },
-        { id: 't2', name: 'B', color: 'green' },
-        { id: 't3', name: 'C', color: 'blue' },
-        { id: 't4', name: 'D', color: 'red' },
-        { id: 't5', name: 'E', color: 'tan' },
-      ],
-    );
-    expect(screen.getByTestId('tag-chip-t1')).toBeInTheDocument();
-    expect(screen.getByTestId('tag-chip-t2')).toBeInTheDocument();
-    expect(screen.getByTestId('tag-chip-t3')).toBeInTheDocument();
-    expect(screen.queryByTestId('tag-chip-t4')).toBeNull();
-    expect(screen.getByTestId('tag-overflow')).toHaveTextContent('+2');
   });
 });

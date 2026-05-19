@@ -97,7 +97,6 @@ describe("TodoStore", () => {
       flagged: true,
       dueDate: 1715817600000,
       scheduledWhen: "today",
-      tags: ["Reading"],
     });
     const t = s.get("a");
     expect(t?.title).toBe("Read A Pattern Language");
@@ -105,7 +104,6 @@ describe("TodoStore", () => {
     expect(t?.flagged).toBe(true);
     expect(t?.dueDate).toBe(1715817600000);
     expect(t?.scheduledWhen).toBe("today");
-    expect(t?.tags).toEqual(["Reading"]);
     expect(t?.done).toBe(false);
   });
 
