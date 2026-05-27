@@ -1,0 +1,52 @@
+[package]
+name = "todo-p2p-iroh-wasm"
+version = "0.0.0"
+edition = "2021"
+publish = false
+rust-version = "1.77"
+
+# Browser iroh transport (E1.2). Compiled to wasm32 via wasm-pack and run inside
+# a Web Worker (see apps/web/src/runtime/irohWorker.ts). The wire protocol
+# (ALPN, JSON DialTicket, AuthFrame, one-message-per-bi-stream framing) is kept
+# byte-identical to the desktop transport in apps/desktop/src-tauri/src/iroh so
+# desktop <-> web pairs and syncs. Keep the two in sync.
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# Browser builds must drop native-only default features (portmapper, apple
+# datapath); tls-ring is the wasm-compatible TLS backend. Browser endpoints are
+# relay-only (no UDP) but still end-to-end encrypted.
+iroh = { version = "=1.0.0-rc.0", default-features = false, features = ["tls-ring"] }
+wasm-bindgen = "=0.2.121"
+wasm-bindgen-futures = "0.4.50"
+js-sys = "0.3"
+getrandom = { version = "0.3", features = ["wasm_js"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde-wasm-bindgen = "0.6"
+console_error_panic_hook = "0.1"
+blake3 = "1"
+hex = "0.4"
+dashmap = "6"
+tokio = { version = "1", default-features = false, features = ["sync"] }
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
+
+# wasm-pack's bundled wasm-opt must be told to allow the wasm features modern
+# rustc emits by default (bulk-memory, non-trapping float→int, etc.), or it
+# rejects the module during optimization. All are baseline in current browsers.
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = [
+    "-O",
+    "--enable-bulk-memory",
+    "--enable-nontrapping-float-to-int",
+    "--enable-sign-ext",
+    "--enable-mutable-globals",
+    "--enable-multivalue",
+    "--enable-reference-types",
+]

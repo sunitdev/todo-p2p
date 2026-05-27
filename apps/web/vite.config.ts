@@ -15,10 +15,14 @@ function devCspPlugin(): Plugin {
     name: 'todo-p2p:dev-csp',
     apply: 'serve',
     transformIndexHtml(html) {
-      const connectDev = `connect-src 'self' ws://localhost:${PORT} http://localhost:${PORT};`;
+      // Insert localhost origins right after 'self' so the production relay
+      // hosts (https/wss *.iroh.link, *.iroh.network) are preserved.
       const styleDev = `style-src 'self' 'unsafe-inline';`;
       return html
-        .replace(/connect-src 'self';/, connectDev)
+        .replace(
+          "connect-src 'self'",
+          `connect-src 'self' ws://localhost:${PORT} http://localhost:${PORT}`,
+        )
         .replace(/style-src 'self';/, styleDev);
     },
   };

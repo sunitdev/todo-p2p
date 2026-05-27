@@ -78,6 +78,19 @@ export class SyncEngine {
     }
   }
 
+  /**
+   * Replay this document's full history to a freshly paired peer so it catches
+   * up. Each change is sent individually; the peer applies them via its
+   * `onMessage` → `handleRemote` path. Errors surface as `send` events, never
+   * thrown. Both peers call this after confirming the fingerprint, so state
+   * converges in both directions.
+   */
+  async initialSyncTo(peer: { send(p: Uint8Array): Promise<void> }): Promise<void> {
+    for (const change of this.store.allChanges()) {
+      await peer.send(change).catch((e) => this.emitErr(e, "send"));
+    }
+  }
+
   private async handleRemote(peerId: string, payload: Uint8Array): Promise<void> {
     try {
       const changed = this.store.applyChange(payload);

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Settings as SettingsIcon } from 'lucide-react';
-import { SyncEngine } from '@todo-p2p/core';
+import { SyncEngine, encodePairingPayload, type PairingState } from '@todo-p2p/core';
 import {
   Home,
   Pairing,
@@ -9,19 +9,19 @@ import {
   StoreProvider,
   Unsupported,
 } from '@todo-p2p/ui';
-import { WebStorageAdapter } from './storage/webStorage';
-import { NullTransport } from './runtime/nullTransport';
+import { createRuntime } from './runtime/createRuntime';
+import { PeerManager } from './runtime/peerManager';
+import { PairingController } from './runtime/pairingController';
+import { ScanPairing } from './screens/ScanPairing';
+import { hasWebTransport, isTauri } from './runtime/env';
+
+// Re-exported for tests that assert capability detection.
+export { hasWebTransport, isTauri };
 
 /**
- * Tauri global-shortcut bridge. Desktop wave wires `Cmd/Ctrl+Space` at the OS
- * level (so the panel opens even when another app is focused) and emits
- * `"quick-entry-open"`. We re-dispatch it as a window-level CustomEvent so
- * the `useCustomEvent` consumer in `Home` reacts identically whether the
- * trigger came from in-window keydown or from the Tauri bridge.
- *
- * On web (no Tauri), `window.__TAURI_INTERNALS__` is undefined and the
- * dynamic import resolves to a no-op listener. We never silently fall back to
- * a less-private channel; the only side-effect is opening the in-app panel.
+ * Tauri global-shortcut bridge. Desktop wires `Cmd/Ctrl+Space` at the OS level
+ * and emits `"quick-entry-open"`; we re-dispatch it as a window CustomEvent so
+ * `Home` reacts identically to in-window and global triggers. No-op on web.
  */
 function useTauriQuickEntryBridge(): void {
   useEffect(() => {
@@ -37,9 +37,6 @@ function useTauriQuickEntryBridge(): void {
           window.dispatchEvent(new CustomEvent(QUICK_ENTRY_OPEN_EVENT));
         });
       } catch (e) {
-        // Bridge load failure is non-fatal — fall back to window-focused
-        // shortcut. Logged to console (never user-facing) per CLAUDE.md.
-
         console.warn('[quick-entry] tauri bridge unavailable:', e);
       }
     })();
@@ -52,32 +49,20 @@ function useTauriQuickEntryBridge(): void {
 
 type Route = 'home' | 'pairing' | 'settings' | 'unsupported';
 
+interface Ready {
+  kind: 'ready';
+  engine: SyncEngine;
+  peers: PeerManager;
+  transport: Awaited<ReturnType<typeof createRuntime>>['transport'];
+  nodeId: string;
+  pairing: PairingController;
+}
+
 type State =
   | { kind: 'loading' }
-  | { kind: 'ready'; engine: SyncEngine }
+  | Ready
   | { kind: 'unsupported' }
   | { kind: 'error'; message: string };
-
-/**
- * WebTransport is required for the web target's iroh transport. Per CLAUDE.md
- * we never silently fall back — Safari and other browsers without WebTransport
- * land on the Unsupported screen. Exported for tests.
- */
-export function hasWebTransport(globalRef: unknown = globalThis): boolean {
-  const g = globalRef as { WebTransport?: unknown };
-  return typeof g.WebTransport === 'function';
-}
-
-/**
- * Tauri desktop loads this same web bundle inside WKWebView/WebView2, which
- * lacks WebTransport on macOS. Desktop runs iroh natively via Rust, so the
- * WebTransport gate must not apply. Detect Tauri via the injected internals
- * global. Exported for tests.
- */
-export function isTauri(globalRef: unknown = globalThis): boolean {
-  const g = globalRef as { __TAURI_INTERNALS__?: unknown };
-  return g.__TAURI_INTERNALS__ != null;
-}
 
 export function App() {
   const [state, setState] = useState<State>({ kind: 'loading' });
@@ -93,26 +78,33 @@ export function App() {
     }
 
     let alive = true;
-    let opened: SyncEngine | null = null;
+    let opened: Ready | null = null;
     (async () => {
       try {
-        const storage = await WebStorageAdapter.open();
-        const transport = new NullTransport();
+        const { storage, transport } = await createRuntime();
         const engine = await SyncEngine.open(storage, transport);
-        opened = engine;
+        const peers = new PeerManager(transport, storage);
+        const nodeId = await peers.start();
+        const pairing = new PairingController({
+          transport,
+          storage,
+          engine,
+          onPaired: (id) => peers.trust(id),
+        });
+        const ready: Ready = { kind: 'ready', engine, peers, transport, nodeId, pairing };
+        opened = ready;
         if (!alive) {
-          await engine.close();
+          await teardown(ready);
           return;
         }
-        setState({ kind: 'ready', engine });
+        setState(ready);
       } catch (e) {
-        const message = e instanceof Error ? e.message : String(e);
-        setState({ kind: 'error', message });
+        setState({ kind: 'error', message: e instanceof Error ? e.message : String(e) });
       }
     })();
     return () => {
       alive = false;
-      if (opened) void opened.close();
+      if (opened) void teardown(opened);
     };
   }, []);
 
@@ -121,16 +113,10 @@ export function App() {
   if (state.kind === 'error') return <ErrorScreen message={state.message} />;
 
   return (
-    <StoreProvider engine={state.engine}>
+    <StoreProvider engine={state.engine} peers={() => state.peers.peers()}>
       {route === 'home' && (
         <>
           <Home />
-          {/*
-            Settings entry point. The sidebar bottom-toolbar slot is owned by
-            another agent's pass; until that lands, expose Settings via a
-            fixed top-right pill. TODO P9.9: lift this into the sidebar's
-            existing toolbar button once Agent E's edits are merged.
-          */}
           <button
             type="button"
             aria-label="Open settings"
@@ -143,41 +129,28 @@ export function App() {
       )}
       {route === 'settings' && (
         <Settings
-          // TODO P9.4: thread real device identity + paired peers + app version
-          // from `packages/core` (DeviceIdentity, PairingState) once the
-          // identity store API is settled.
-          device={{ name: 'This device', id: 'unknown' }}
-          pairedCount={0}
+          device={{ name: 'This device', id: shortId(state.nodeId) }}
+          pairedCount={state.peers.count()}
           version="0.0.0-dev"
           onPairNew={() => setRoute('pairing')}
           onExportBackup={() => {
-            /* TODO P9.5: invoke encrypted Automerge export pipeline */
+            /* TODO M3 (P9.5): encrypted Automerge export pipeline */
           }}
           onWipeDevice={() => {
-            /* TODO P9.6: invoke storage wipe + identity reset */
+            /* TODO M3 (P9.6): storage wipe + identity reset */
           }}
         />
       )}
       {route === 'pairing' && (
-        <Pairing
-          // TODO P9.7: replace placeholders with values from the real pairing
-          // adapter (PairingPayload + PairingState in @todo-p2p/core). Until
-          // the adapter exists in the web runtime, render with a synthetic
-          // 60s window so the countdown UI is exercised.
-          payload="placeholder"
-          expiresAt={Date.now() + 60_000}
-          fingerprint="a3·f9·7c"
-          onConfirm={() => setRoute('home')}
-          onSwitchToScan={() => {
-            /* TODO P9.8: open camera-scan flow */
-          }}
-          onRegenerate={() => setRoute('pairing')}
-        />
+        <PairingFlow pairing={state.pairing} onDone={() => setRoute('home')} />
       )}
       {(route === 'settings' || route === 'pairing') && (
         <button
           type="button"
-          onClick={() => setRoute('home')}
+          onClick={() => {
+            if (route === 'pairing') state.pairing.reset();
+            setRoute('home');
+          }}
           aria-label="Back"
           className="fixed left-4 top-3 z-30 inline-flex h-8 items-center rounded-full px-3 text-callout text-tint hover:bg-bg-l3"
         >
@@ -185,6 +158,166 @@ export function App() {
         </button>
       )}
     </StoreProvider>
+  );
+}
+
+async function teardown(r: Ready): Promise<void> {
+  await r.peers.stop();
+  await r.transport.stop();
+  await r.engine.close();
+}
+
+/** Short, human-glanceable form of the long iroh node id for Settings. */
+function shortId(nodeId: string): string {
+  const head = nodeId.slice(0, 6);
+  return `${head.slice(0, 2)}·${head.slice(2, 4)}·${head.slice(4, 6)}`;
+}
+
+/**
+ * Drives the pairing UI off the `PairingController` state. Host mode shows the
+ * QR; scan mode opens the camera; either path lands on the fingerprint confirm.
+ */
+function PairingFlow({ pairing, onDone }: { pairing: PairingController; onDone: () => void }) {
+  const [state, setState] = useState<PairingState>(pairing.getState());
+  const [mode, setMode] = useState<'host' | 'scan'>('host');
+
+  useEffect(() => pairing.subscribe(setState), [pairing]);
+
+  // Begin hosting on entry; reset on leave.
+  useEffect(() => {
+    void pairing.host();
+    return () => pairing.reset();
+  }, [pairing]);
+
+  useEffect(() => {
+    if (state.kind === 'paired') onDone();
+  }, [state.kind, onDone]);
+
+  if (state.kind === 'awaiting-fingerprint-confirm' || state.kind === 'syncing') {
+    const fp = state.kind === 'awaiting-fingerprint-confirm' ? state.payload.fingerprint : '';
+    return (
+      <FingerprintConfirm
+        fingerprint={fp}
+        busy={state.kind === 'syncing'}
+        onConfirm={() => void pairing.confirm()}
+        onReject={() => {
+          pairing.reject();
+          setMode('host');
+          void pairing.host();
+        }}
+      />
+    );
+  }
+
+  if (state.kind === 'failed') {
+    return (
+      <PairMessage
+        title="Pairing failed"
+        body={state.reason}
+        action="Try again"
+        onAction={() => {
+          setMode('host');
+          void pairing.host();
+        }}
+      />
+    );
+  }
+
+  if (mode === 'scan') {
+    return (
+      <ScanPairing
+        onScan={(raw) => void pairing.scan(raw)}
+        onCancel={() => {
+          setMode('host');
+          void pairing.host();
+        }}
+      />
+    );
+  }
+
+  if (state.kind === 'showing-ticket') {
+    return (
+      <Pairing
+        payload={encodePairingPayload(state.payload)}
+        expiresAt={state.expiresAt}
+        fingerprint={state.payload.fingerprint}
+        onConfirm={() => void pairing.confirm()}
+        onSwitchToScan={() => setMode('scan')}
+        onRegenerate={() => void pairing.host()}
+      />
+    );
+  }
+
+  return <Splash />;
+}
+
+function FingerprintConfirm({
+  fingerprint,
+  busy,
+  onConfirm,
+  onReject,
+}: {
+  fingerprint: string;
+  busy: boolean;
+  onConfirm: () => void;
+  onReject: () => void;
+}) {
+  return (
+    <div className="flex h-full w-full items-center justify-center bg-bg-l2 px-4">
+      <div className="w-[480px] max-w-[92vw] rounded-4 border border-separator bg-bg-l1 p-6 text-center shadow-ambient">
+        <h1 className="text-title font-bold text-label">Confirm fingerprint</h1>
+        <p className="mt-1 text-callout text-label-secondary">
+          Check that these words match on both devices.
+        </p>
+        <p className="mt-5 font-mono text-headline tracking-wide text-label">{fingerprint}</p>
+        <div className="mt-6 flex justify-center gap-3">
+          <button
+            type="button"
+            onClick={onReject}
+            disabled={busy}
+            className="inline-flex h-8 items-center rounded-full border border-separator px-4 text-callout text-label hover:bg-bg-l3 disabled:opacity-40"
+          >
+            They differ
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={busy}
+            className="inline-flex h-8 items-center rounded-full bg-tint px-4 text-callout font-medium text-white hover:opacity-90 disabled:opacity-40"
+          >
+            {busy ? 'Syncing…' : 'They match'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PairMessage({
+  title,
+  body,
+  action,
+  onAction,
+}: {
+  title: string;
+  body: string;
+  action: string;
+  onAction: () => void;
+}) {
+  return (
+    <div className="flex h-full w-full items-center justify-center bg-bg-l2 px-4">
+      <div className="w-[480px] max-w-[92vw] rounded-4 border border-separator bg-bg-l1 p-6 text-center shadow-ambient">
+        <h1 className="text-title font-bold text-label">{title}</h1>
+        <p className="mt-2 text-callout text-label-secondary">{body}</p>
+        <button
+          type="button"
+          onClick={onAction}
+          className="mt-6 inline-flex h-8 items-center rounded-full bg-tint px-4 text-callout font-medium text-white hover:opacity-90"
+        >
+          {action}
+        </button>
+      </div>
+    </div>
   );
 }
 

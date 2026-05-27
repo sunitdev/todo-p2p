@@ -18,9 +18,11 @@
   },
   "dependencies": {
     "@todo-p2p/core": "workspace:*",
+    "@types/qrcode": "1.5.6",
     "clsx": "2.1.1",
     "lucide-react": "0.460.0",
     "motion": "12.39.0",
+    "qrcode": "1.5.4",
     "tailwind-merge": "3.6.0"
   },
   "devDependencies": {

@@ -75,9 +75,15 @@ const StoreCtx = createContext<StoreValue | null>(null);
 
 export function StoreProvider({
   engine,
+  peers,
   children,
 }: {
   engine: SyncEngine;
+  /**
+   * Supplier of live peer connections to broadcast local changes to. Defaults
+   * to none (single-device / tests). The web runtime passes `PeerManager.peers`.
+   */
+  peers?: () => { send(p: Uint8Array): Promise<void> }[];
   children: ReactNode;
 }) {
   const [version, setVersion] = useState(0);
@@ -95,9 +101,9 @@ export function StoreProvider({
 
   const commit = useCallback(
     async (change: Uint8Array) => {
-      await engine.commit(change, []);
+      await engine.commit(change, peers ? peers() : []);
     },
-    [engine],
+    [engine, peers],
   );
 
   const store = engine.todos();

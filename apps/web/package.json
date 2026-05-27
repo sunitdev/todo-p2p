@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "bun run --filter @todo-p2p/iroh-wasm build:wasm && tsc --noEmit && vite build",
     "preview": "vite preview --port 5173",
     "typecheck": "tsc --noEmit",
     "test": "bun test ./__tests__",
@@ -14,7 +14,9 @@
   "dependencies": {
     "@tauri-apps/api": "2",
     "@todo-p2p/core": "workspace:*",
+    "@todo-p2p/iroh-wasm": "workspace:*",
     "@todo-p2p/ui": "workspace:*",
+    "@zxing/browser": "0.2.0",
     "lucide-react": "0.460.0",
     "motion": "12.39.0",
     "react": "18.3.1",

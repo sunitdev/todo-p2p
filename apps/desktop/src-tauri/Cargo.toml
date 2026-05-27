@@ -5,6 +5,13 @@ edition = "2021"
 publish = false
 rust-version = "1.77"
 
+# Tauri convention: app logic lives in a lib crate so `main.rs` is a thin shim
+# (and a mobile entry point can reuse it post-1.0). `iroh`/`pairing` modules hang
+# off this lib; integration tests compile against it.
+[lib]
+name = "todo_p2p_desktop"
+crate-type = ["lib"]
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
@@ -17,6 +24,21 @@ tauri-plugin-dialog = "2"
 tauri-plugin-global-shortcut = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+
+# M1 — P2P transport (E1.1). iroh pinned to an exact pre-release: the post-rc.0
+# line renamed core identity types, so do not float this. Native build keeps
+# default features (QUIC + relay + n0 discovery).
+iroh = "=1.0.0-rc.0"
+blake3 = "1"            # 6-word pairing fingerprint, byte-identical to TS @noble/hashes
+dashmap = "6"           # live peer-connection + pairing-ticket registries
+rand = "0.8"            # OsRng: per-ticket pre-shared key + (M1) ephemeral node secret
+hex = "0.4"             # node-id / psk-hash string encoding shared with the QR payload
+tokio = { version = "1", features = ["sync", "macros"] }  # Mutex; Tauri supplies the runtime
+
+[dev-dependencies]
+# Tests bind two real iroh endpoints in one process and connect over loopback
+# (no relay, no network). They need a multi-thread runtime + timers.
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync"] }
 
 [profile.release]
 codegen-units = 1

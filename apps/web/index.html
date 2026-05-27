@@ -6,13 +6,18 @@
       Production CSP. Vite dev server rewrites this at request time to add
       ws://localhost:<port> / http://localhost:<port> to connect-src — see
       vite.config.ts. Never edit this for dev; never ship localhost origins.
+
+      connect-src allows the n0 iroh relays + discovery only (*.iroh.link and
+      *.iroh.network, over https + wss). Browser iroh is relay-only, so this is
+      the sole non-self egress — it carries ciphertext only (ARCHITECTURE.md
+      "iroh DERP relays"). No analytics/telemetry origins. See todo-security.
     -->
     <meta http-equiv="Content-Security-Policy"
       content="default-src 'self';
                script-src 'self' 'wasm-unsafe-eval';
                style-src 'self';
                img-src 'self' data:;
-               connect-src 'self';
+               connect-src 'self' https://*.iroh.link wss://*.iroh.link https://*.iroh.network wss://*.iroh.network;
                worker-src 'self' blob:;
                object-src 'none';
                base-uri 'self';

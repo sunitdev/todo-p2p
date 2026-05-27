@@ -25,6 +25,15 @@ export class NullTransport implements TransportAdapter {
   async dialTrusted(): Promise<PeerConnection> {
     throw new Error('pairing unavailable — transport not yet wired');
   }
+  connectionTo(peerId: string): PeerConnection {
+    return {
+      peerId,
+      async send() {
+        throw new Error('pairing unavailable — transport not yet wired');
+      },
+      async close() {},
+    };
+  }
   onMessage(): Unsubscribe {
     return () => {};
   }

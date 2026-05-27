@@ -12,6 +12,8 @@ export default [
       '**/target/**',
       'apps/desktop/src-tauri/gen/**',
       'apps/mobile/**',
+      // Generated wasm-bindgen glue (built by scripts/build-wasm.sh).
+      'packages/iroh-wasm/pkg/**',
     ],
   },
   js.configs.recommended,

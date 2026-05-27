@@ -140,6 +140,15 @@ export class TodoStore {
     return Automerge.save(this.doc);
   }
 
+  /**
+   * Every change in this document's history, in dependency order. Used for the
+   * initial post-pairing sync: each change is sent to the new peer as its own
+   * message and applied via {@link applyChange}, replaying full history.
+   */
+  allChanges(): Uint8Array[] {
+    return Automerge.getAllChanges(this.doc);
+  }
+
   /** Returns the wire-format Automerge change for the new todo. */
   add(input: Omit<Todo, "createdAt" | "done">): Uint8Array {
     const before = this.doc;

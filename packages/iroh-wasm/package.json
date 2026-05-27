@@ -1,0 +1,22 @@
+{
+  "name": "@todo-p2p/iroh-wasm",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Browser iroh transport (Rust -> wasm-bindgen). Built by scripts/build-wasm.sh into pkg/.",
+  "main": "./pkg/todo_p2p_iroh_wasm.js",
+  "module": "./pkg/todo_p2p_iroh_wasm.js",
+  "types": "./pkg/todo_p2p_iroh_wasm.d.ts",
+  "exports": {
+    ".": {
+      "types": "./pkg/todo_p2p_iroh_wasm.d.ts",
+      "default": "./pkg/todo_p2p_iroh_wasm.js"
+    },
+    "./wasm-url": "./pkg/todo_p2p_iroh_wasm_bg.wasm"
+  },
+  "files": ["pkg"],
+  "scripts": {
+    "build:wasm": "bash ../../scripts/build-wasm.sh",
+    "clean": "rm -rf pkg target"
+  }
+}

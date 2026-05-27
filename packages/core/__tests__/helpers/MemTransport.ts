@@ -34,6 +34,9 @@ export class MemTransport implements TransportAdapter {
   async dialTrusted(): Promise<PeerConnection> {
     throw new Error("not used");
   }
+  connectionTo(peerId: string): PeerConnection {
+    return { peerId, async send() {}, async close() {} };
+  }
   onMessage(h: MessageHandler): Unsubscribe {
     this.handlers.add(h);
     return () => this.handlers.delete(h);

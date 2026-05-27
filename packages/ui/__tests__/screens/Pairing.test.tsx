@@ -69,6 +69,16 @@ describe('Pairing screen', () => {
     expect(screen.getByText(/Expires in 01:00/)).toBeInTheDocument();
   });
 
+  test('renders the payload as a QR symbol of SVG rects', () => {
+    const props = baseProps();
+    render(<Pairing {...props} />);
+    const qr = screen.getByRole('img', { name: 'Pairing QR code' });
+    expect(qr.tagName.toLowerCase()).toBe('svg');
+    // A real QR symbol has many dark-module runs.
+    expect(qr.querySelectorAll('rect').length).toBeGreaterThan(2);
+    expect(qr.getAttribute('data-payload-length')).toBe(String(props.payload.length));
+  });
+
   test('countdown ticks every second', () => {
     const props = baseProps();
     render(<Pairing {...props} />);

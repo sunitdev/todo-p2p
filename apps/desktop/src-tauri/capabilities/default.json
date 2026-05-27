@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Minimal capabilities. iroh:* and storage:* added per-command as they land.",
+  "description": "Minimal capabilities: core app/event/window, dialog, global-shortcut only. The iroh_* transport commands (M1) and future storage_* commands are app-defined and invokable without an ACL entry — their events ride on core:event:default. No shell/http/fs permissions are granted (CLAUDE.md allowlist).",
   "windows": ["main"],
   "permissions": [
     "core:app:default",

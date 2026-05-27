@@ -5,7 +5,7 @@ description: todo-p2p privacy/security rules (non-negotiable). Use when touching
 
 # Privacy & Security (non-negotiable)
 
-**Network egress**: No telemetry, analytics, crash reporting, 3rd-party SDKs phoning home. Allowed = iroh peers + iroh relays only. Any other → raise before adding. No exceptions.
+**Network egress**: No telemetry, analytics, crash reporting, 3rd-party SDKs phoning home. Allowed = iroh peers + iroh relays only. Any other → raise before adding. No exceptions. Concrete (M1): n0 default relays — web `connect-src` allows `https://*.iroh.link wss://*.iroh.link https://*.iroh.network wss://*.iroh.network` only (relays see ciphertext). Browser iroh is relay-only. To self-host relays later, narrow this to your host.
 
 **Logging**: Never log secrets, raw Automerge changes, peer fingerprints. Applies to console, files, Tauri events, telemetry stubs, dev dumps.
 

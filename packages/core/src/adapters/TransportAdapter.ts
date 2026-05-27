@@ -19,6 +19,13 @@ export interface TransportAdapter {
   /** Reconnect to a previously trusted peer. */
   dialTrusted(nodeId: string): Promise<PeerConnection>;
 
+  /**
+   * Sendable handle to an already-connected peer (by id). Used to talk back to
+   * peers that dialed *us* — those arrive via `onPeerStatus` "connected" with no
+   * dial result. Does not open a connection; `send` fails if the peer is gone.
+   */
+  connectionTo(peerId: string): PeerConnection;
+
   /** Subscribe to incoming sync messages from any connected peer. */
   onMessage(handler: (peerId: string, payload: Uint8Array) => void): Unsubscribe;
   /** Subscribe to peer connection lifecycle. */
