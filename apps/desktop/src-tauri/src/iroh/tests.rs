@@ -23,7 +23,7 @@ struct Node {
 
 async fn start_node() -> Node {
     let events = Arc::new(EventBus::new());
-    let shared = Shared::start(events, /* use_relay */ false)
+    let shared = Shared::start(events, /* use_relay */ false, SecretKey::generate())
         .await
         .expect("endpoint binds");
     let router = Router::builder(shared.endpoint.clone())

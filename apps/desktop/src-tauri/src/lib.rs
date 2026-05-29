@@ -4,10 +4,13 @@
 //! compile against the lib crate. M1 adds the iroh transport (`iroh` module)
 //! behind `iroh_*` Tauri commands.
 
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
 pub mod iroh;
+pub mod keystore;
+pub mod migrations;
+pub mod storage;
 
 /// Phase 5: global shortcut for Quick Entry. macOS uses Cmd+Space (matches
 /// Things3); Windows/Linux use Ctrl+Space. Bound at startup; if registration
@@ -48,6 +51,7 @@ pub fn run() {
                 .build(),
         )
         .manage(iroh::IrohState::default())
+        .manage(storage::StorageState::default())
         .invoke_handler(tauri::generate_handler![
             iroh::iroh_start,
             iroh::iroh_stop,
@@ -57,8 +61,31 @@ pub fn run() {
             iroh::iroh_send,
             iroh::iroh_close_peer,
             iroh::iroh_subscribe,
+            storage::storage_load_doc,
+            storage::storage_save_doc,
+            storage::storage_append_change,
+            storage::storage_load_changes,
+            storage::storage_truncate_changes,
+            storage::storage_load_trusted_peers,
+            storage::storage_save_trusted_peer,
+            storage::storage_remove_trusted_peer,
         ])
         .setup(|app| {
+            // Resolve the encrypted DB path under the OS app-data dir and hand it
+            // to the storage state (the connection opens lazily on first command,
+            // unlocking with the keyring key). Best-effort dir create; failures go
+            // to stderr, never to the user.
+            match app.path().app_data_dir() {
+                Ok(dir) => {
+                    if let Err(e) = std::fs::create_dir_all(&dir) {
+                        eprintln!("[storage] failed to create app data dir: {e}");
+                    }
+                    app.state::<storage::StorageState>()
+                        .set_db_path(dir.join("todo.db"));
+                }
+                Err(e) => eprintln!("[storage] app data dir unavailable: {e}"),
+            }
+
             // Register the shortcut after the plugin is installed. A failure
             // here typically means another running app already owns the combo —
             // we surface the error to stderr (never to the user) and let the

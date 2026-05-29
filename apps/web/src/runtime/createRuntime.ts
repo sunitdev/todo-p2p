@@ -1,5 +1,6 @@
 import type { StorageAdapter, TransportAdapter } from '@todo-p2p/core/adapters';
 import { WebStorageAdapter } from '../storage/webStorage';
+import { TauriStorageAdapter } from './tauriStorage';
 import { NullTransport } from './nullTransport';
 import { IrohWebTransport } from './irohWebTransport';
 import { IrohTauriTransport } from './irohTauriTransport';
@@ -11,9 +12,13 @@ export interface Runtime {
 }
 
 /**
- * Realizes the platform's adapters and wires runtime selection. Storage is the
- * web OPFS+AES-GCM adapter on both web and the desktop webview for M1 (native
- * SQLCipher storage is M2). Transport is selected by host:
+ * Realizes the platform's adapters and wires runtime selection. Storage is
+ * selected by host:
+ *   - Tauri  → `TauriStorageAdapter` (native SQLCipher in Rust, key in the OS
+ *              keyring — M2).
+ *   - Web    → `WebStorageAdapter` (OPFS + AES-GCM, key in non-extractable
+ *              WebCrypto).
+ * Transport is selected by host:
  *   - Tauri  → `IrohTauriTransport` (iroh runs natively in Rust). No fallback:
  *              a transport failure here is a real error, surfaced by the caller.
  *   - Web    → `IrohWebTransport` (iroh-js WASM in a Worker). If the WASM module
@@ -21,7 +26,7 @@ export interface Runtime {
  *              single-device app, never a weaker *transport* (CLAUDE.md).
  */
 export async function createRuntime(): Promise<Runtime> {
-  const storage = await WebStorageAdapter.open();
+  const storage = isTauri() ? await TauriStorageAdapter.open() : await WebStorageAdapter.open();
   const transport = await selectTransport();
   return { storage, transport };
 }

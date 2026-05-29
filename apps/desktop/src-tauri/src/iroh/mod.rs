@@ -229,8 +229,14 @@ struct Shared {
 }
 
 impl Shared {
-    async fn start(events: Arc<EventBus>, use_relay: bool) -> Result<Arc<Self>, String> {
-        let secret = SecretKey::generate();
+    /// `secret` is the device identity. In production it comes from the OS
+    /// keyring (`keystore::iroh_secret`) so the NodeId is stable across restarts;
+    /// tests pass an ephemeral generated key to avoid touching the keyring.
+    async fn start(
+        events: Arc<EventBus>,
+        use_relay: bool,
+        secret: SecretKey,
+    ) -> Result<Arc<Self>, String> {
         let endpoint = if use_relay {
             Endpoint::builder(N0)
                 .secret_key(secret)
@@ -534,7 +540,10 @@ pub async fn iroh_start(state: State<'_, IrohState>) -> Result<String, String> {
     if let Some(r) = slot.as_ref() {
         return Ok(r.shared.node_id());
     }
-    let shared = Shared::start(state.events.clone(), true).await?;
+    // Durable device identity: load (or first-run generate) the iroh secret from
+    // the OS keyring so this device keeps the same NodeId across restarts.
+    let secret = SecretKey::from_bytes(&crate::keystore::iroh_secret()?);
+    let shared = Shared::start(state.events.clone(), true, secret).await?;
     let proto = SyncProtocol {
         shared: shared.clone(),
     };

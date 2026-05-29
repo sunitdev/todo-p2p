@@ -49,8 +49,9 @@ lint: ## Lint all TS/TSX
 typecheck: ## Typecheck workspace
 	bun run typecheck
 
-test: ## Run unit tests across all workspaces
+test: ## Run unit tests across all workspaces (TS + Rust desktop)
 	bun run test
+	cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
 
 test-e2e: ## Run end-to-end Playwright tests (Chromium + WebKit)
 	bun run test:e2e

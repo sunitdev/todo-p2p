@@ -125,3 +125,9 @@ jobs:
       - name: Build
         working-directory: apps/desktop/src-tauri
         run: cargo build --release
+      - name: Test
+        working-directory: apps/desktop/src-tauri
+        # Rust unit + integration tests (iroh loopback, SQLCipher storage,
+        # keystore via the in-memory mock, migration parity). Headless-safe:
+        # keyring tests use the mock backend, storage uses tempfile DBs.
+        run: cargo test

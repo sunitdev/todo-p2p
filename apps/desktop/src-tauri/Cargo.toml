@@ -35,10 +35,36 @@ rand = "0.8"            # OsRng: per-ticket pre-shared key + (M1) ephemeral node
 hex = "0.4"             # node-id / psk-hash string encoding shared with the QR payload
 tokio = { version = "1", features = ["sync", "macros"] }  # Mutex; Tauri supplies the runtime
 
+# M2 — desktop native persistence (E2.x).
+# `automerge` reads/writes the same columnar storage format as @automerge/automerge
+# 2.2.8 (packages/core); 0.6.1 is the newest release on our rust-version 1.77 (0.9
+# needs 1.89). Used for the Rust mirror of the doc-schema migrations (E2.3).
+automerge = "=0.6.1"
+# SQLCipher at-rest encryption (E2.1). Vendored OpenSSL + statically-bundled
+# SQLCipher → no system libs on any platform CI; key supplied via PRAGMA from the
+# OS keyring. CLAUDE.md: at-rest encrypted, key never on disk in the clear.
+# Pinned to 0.32: rusqlite 0.40 pulls libsqlite3-sys 0.38 whose build.rs uses the
+# still-unstable `cfg_select!` and fails on stable rustc. 0.32 (libsqlite3-sys
+# 0.28) builds cleanly and has the same SQLCipher feature.
+rusqlite = { version = "0.32", features = ["bundled-sqlcipher-vendored-openssl"] }
+# OS keyring for the SQLCipher key + the iroh SecretKey (E2.2): Keychain (mac) /
+# Credential Manager (win) / Secret Service (linux). `crypto-rust` keeps the linux
+# secret-service backend OpenSSL-free. Raw key never read/exported (CLAUDE.md).
+keyring = { version = "3", features = [
+  "apple-native",
+  "windows-native",
+  "sync-secret-service",
+  "crypto-rust",
+] }
+
 [dev-dependencies]
 # Tests bind two real iroh endpoints in one process and connect over loopback
 # (no relay, no network). They need a multi-thread runtime + timers.
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync"] }
+# Storage tests open a throwaway SQLCipher DB on disk. keyring's built-in `mock`
+# credential store (no feature flag) backs keystore tests headlessly — the real
+# Secret Service needs a D-Bus session unavailable in CI.
+tempfile = "3"
 
 [profile.release]
 codegen-units = 1
