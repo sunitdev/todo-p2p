@@ -36,6 +36,15 @@ export class WebSecureKeyStore implements SecureKeyStore {
     await idbDelete(this.db, key);
   }
 
+  /**
+   * Device wipe (M3 / P9.6). Drops the AEAD doc key so the OPFS blobs left
+   * behind (if any) are permanently undecryptable, and so the next run mints a
+   * fresh key — a new at-rest identity, not the old one.
+   */
+  async wipe(): Promise<void> {
+    await idbDelete(this.db, DOC_KEY_ID);
+  }
+
   async isHardwareBacked(): Promise<boolean> {
     return false;
   }

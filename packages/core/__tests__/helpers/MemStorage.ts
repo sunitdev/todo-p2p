@@ -60,4 +60,9 @@ export class MemStorage implements StorageAdapter {
   async removeTrustedPeer(id: string) {
     this.peers.delete(id);
   }
+  async wipe() {
+    this.doc = null;
+    this.changes = [];
+    this.peers.clear();
+  }
 }

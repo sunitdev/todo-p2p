@@ -77,4 +77,8 @@ export class TauriStorageAdapter implements StorageAdapter {
   async removeTrustedPeer(nodeId: string): Promise<void> {
     await this.invoke('storage_remove_trusted_peer', { nodeId });
   }
+
+  async wipe(): Promise<void> {
+    await this.invoke('storage_wipe');
+  }
 }

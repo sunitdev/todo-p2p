@@ -72,5 +72,23 @@ export function storageAdapterContract(
       await a.saveDoc(new Uint8Array([2, 2, 2]));
       expect(await a.loadDoc()).toEqual(new Uint8Array([2, 2, 2]));
     });
+
+    test("wipe clears doc, changes, and trusted peers", async () => {
+      const a = await make();
+      await a.saveDoc(new Uint8Array([1, 2, 3]));
+      await a.appendChange(new Uint8Array([4, 5]));
+      await a.saveTrustedPeer({
+        nodeId: "node-xyz",
+        publicKey: new Uint8Array([1, 2, 3]),
+        pairedAt: 1715000000000,
+        lastSeenAt: 1715000001000,
+      });
+
+      await a.wipe();
+
+      expect(await a.loadDoc()).toBeNull();
+      expect(await a.loadChanges()).toEqual([]);
+      expect(await a.loadTrustedPeers()).toEqual([]);
+    });
   });
 }

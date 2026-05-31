@@ -10,6 +10,7 @@ const baseProps = () => ({
   version: '0.1.0',
   onPairNew: mock(),
   onExportBackup: mock(),
+  onImportBackup: mock(),
   onWipeDevice: mock(),
 });
 
@@ -49,6 +50,13 @@ describe('Settings screen', () => {
     render(<Settings {...props} />);
     fireEvent.click(screen.getByRole('button', { name: 'Export backup' }));
     expect(props.onExportBackup).toHaveBeenCalledTimes(1);
+  });
+
+  test('Import backup fires callback', () => {
+    const props = baseProps();
+    render(<Settings {...props} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Import backup' }));
+    expect(props.onImportBackup).toHaveBeenCalledTimes(1);
   });
 
   test('Wipe device requires confirm before firing', () => {

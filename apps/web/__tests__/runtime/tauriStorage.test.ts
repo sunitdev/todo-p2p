@@ -55,6 +55,11 @@ function mockBackend() {
       case 'storage_remove_trusted_peer':
         peers = peers.filter((q) => q.nodeId !== (args?.nodeId as string));
         return undefined as T;
+      case 'storage_wipe':
+        doc = null;
+        changes = [];
+        peers = [];
+        return undefined as T;
       default:
         throw new Error(`unexpected command ${cmd}`);
     }
@@ -111,6 +116,24 @@ describe('TauriStorageAdapter (mock invoke)', () => {
     expect(list[0]?.publicKey).toBeInstanceOf(Uint8Array);
 
     await a.removeTrustedPeer('node-abc');
+    expect(await a.loadTrustedPeers()).toEqual([]);
+  });
+
+  test('wipe clears doc, changes, and peers via storage_wipe', async () => {
+    const a = adapter();
+    await a.saveDoc(new Uint8Array([1, 2, 3]));
+    await a.appendChange(new Uint8Array([4]));
+    await a.saveTrustedPeer({
+      nodeId: 'node-abc',
+      publicKey: new Uint8Array([1]),
+      pairedAt: 1,
+      lastSeenAt: 2,
+    });
+
+    await a.wipe();
+
+    expect(await a.loadDoc()).toBeNull();
+    expect(await a.loadChanges()).toEqual([]);
     expect(await a.loadTrustedPeers()).toEqual([]);
   });
 });

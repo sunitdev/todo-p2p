@@ -19,6 +19,7 @@ export interface SettingsProps {
   version: string;
   onPairNew: () => void;
   onExportBackup: () => void;
+  onImportBackup: () => void;
   onWipeDevice: () => void;
   /**
    * Optional source URL. When provided, "View source" renders as an anchor
@@ -35,6 +36,7 @@ export function Settings({
   version,
   onPairNew,
   onExportBackup,
+  onImportBackup,
   onWipeDevice,
   sourceUrl,
 }: SettingsProps) {
@@ -78,6 +80,7 @@ export function Settings({
 
           <Section label="Storage">
             <Row title="Export backup" onClick={onExportBackup} />
+            <Row title="Import backup" onClick={onImportBackup} />
             <Row title="Wipe device" onClick={handleWipe} destructive />
           </Section>
 

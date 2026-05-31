@@ -1,6 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Settings as SettingsIcon } from 'lucide-react';
-import { SyncEngine, encodePairingPayload, type PairingState } from '@todo-p2p/core';
+import {
+  SyncEngine,
+  encodePairingPayload,
+  encryptBackup,
+  decryptBackup,
+  BackupError,
+  type PairingState,
+} from '@todo-p2p/core';
+import type { StorageAdapter } from '@todo-p2p/core/adapters';
 import {
   Home,
   Pairing,
@@ -12,6 +20,9 @@ import {
 import { createRuntime } from './runtime/createRuntime';
 import { PeerManager } from './runtime/peerManager';
 import { PairingController } from './runtime/pairingController';
+import { saveBackupFile, openBackupFile } from './runtime/backupFile';
+import { BackupDialog } from './components/BackupDialog';
+import { SOURCE_URL, RELEASE_URL } from './config';
 import { ScanPairing } from './screens/ScanPairing';
 import { hasWebTransport, isTauri } from './runtime/env';
 
@@ -52,11 +63,18 @@ type Route = 'home' | 'pairing' | 'settings' | 'unsupported';
 interface Ready {
   kind: 'ready';
   engine: SyncEngine;
+  storage: StorageAdapter;
   peers: PeerManager;
   transport: Awaited<ReturnType<typeof createRuntime>>['transport'];
   nodeId: string;
   pairing: PairingController;
 }
+
+/** Drives the encrypted backup passphrase dialog (P9.5). */
+type BackupUi =
+  | { kind: 'none' }
+  | { kind: 'export'; busy: boolean; error: string | null }
+  | { kind: 'import'; file: Uint8Array; busy: boolean; error: string | null };
 
 type State =
   | { kind: 'loading' }
@@ -67,8 +85,18 @@ type State =
 export function App() {
   const [state, setState] = useState<State>({ kind: 'loading' });
   const [route, setRoute] = useState<Route>('home');
+  const [backup, setBackup] = useState<BackupUi>({ kind: 'none' });
+  const [pairedCount, setPairedCount] = useState(0);
 
   useTauriQuickEntryBridge();
+
+  // Keep the Settings peer count live (P9.7): seed it, then track every
+  // connect/disconnect via the PeerManager observer.
+  useEffect(() => {
+    if (state.kind !== 'ready') return;
+    setPairedCount(state.peers.count());
+    return state.peers.onChange(setPairedCount);
+  }, [state]);
 
   useEffect(() => {
     if (!isTauri() && !hasWebTransport()) {
@@ -91,7 +119,7 @@ export function App() {
           engine,
           onPaired: (id) => peers.trust(id),
         });
-        const ready: Ready = { kind: 'ready', engine, peers, transport, nodeId, pairing };
+        const ready: Ready = { kind: 'ready', engine, storage, peers, transport, nodeId, pairing };
         opened = ready;
         if (!alive) {
           await teardown(ready);
@@ -109,8 +137,62 @@ export function App() {
   }, []);
 
   if (state.kind === 'loading') return <Splash />;
-  if (state.kind === 'unsupported') return <Unsupported />;
+  if (state.kind === 'unsupported') return <Unsupported downloadUrl={RELEASE_URL} />;
   if (state.kind === 'error') return <ErrorScreen message={state.message} />;
+
+  const ready = state;
+
+  // P9.5 export: snapshot the doc, seal it with the user's passphrase, hand the
+  // file to the OS. Nothing auto-uploads.
+  const handleExport = async (passphrase: string) => {
+    setBackup({ kind: 'export', busy: true, error: null });
+    try {
+      const file = await encryptBackup(ready.engine.todos().save(), passphrase);
+      await saveBackupFile(file);
+      setBackup({ kind: 'none' });
+    } catch (e) {
+      setBackup({ kind: 'export', busy: false, error: errMsg(e) });
+    }
+  };
+
+  // P9.5 import: pick the file first, then prompt for its passphrase.
+  const startImport = async () => {
+    const file = await openBackupFile();
+    if (!file) return;
+    setBackup({ kind: 'import', file, busy: false, error: null });
+  };
+
+  // Decrypt, confirm the destructive replace, persist the snapshot, reload into
+  // the restored state. A wrong passphrase fails before anything is touched.
+  const handleImport = async (passphrase: string) => {
+    if (backup.kind !== 'import') return;
+    setBackup({ ...backup, busy: true, error: null });
+    try {
+      const snapshot = await decryptBackup(backup.file, passphrase);
+      if (
+        !window.confirm(
+          'Restore this backup? It replaces all data currently on this device. There is no recovery.',
+        )
+      ) {
+        setBackup({ ...backup, busy: false, error: null });
+        return;
+      }
+      await ready.storage.saveDoc(snapshot);
+      await ready.storage.truncateChanges();
+      window.location.reload();
+    } catch (e) {
+      const error = e instanceof BackupError ? e.message : errMsg(e);
+      setBackup({ kind: 'import', file: backup.file, busy: false, error });
+    }
+  };
+
+  // P9.6 wipe: Settings already took the destructive confirm. Close cleanly,
+  // clear storage + identity, reload into a fresh first-run.
+  const handleWipe = async () => {
+    await teardown(ready);
+    await ready.storage.wipe();
+    window.location.reload();
+  };
 
   return (
     <StoreProvider engine={state.engine} peers={() => state.peers.peers()}>
@@ -130,15 +212,15 @@ export function App() {
       {route === 'settings' && (
         <Settings
           device={{ name: 'This device', id: shortId(state.nodeId) }}
-          pairedCount={state.peers.count()}
+          pairedCount={pairedCount}
           version="0.0.0-dev"
           onPairNew={() => setRoute('pairing')}
-          onExportBackup={() => {
-            /* TODO M3 (P9.5): encrypted Automerge export pipeline */
-          }}
-          onWipeDevice={() => {
-            /* TODO M3 (P9.6): storage wipe + identity reset */
-          }}
+          onExportBackup={() => setBackup({ kind: 'export', busy: false, error: null })}
+          onImportBackup={() => void startImport()}
+          onWipeDevice={() => void handleWipe()}
+          // Web routes "View source" to an anchor; desktop stays the disabled
+          // placeholder (no opener in the Tauri allowlist — deferred to M6).
+          {...(isTauri() ? {} : { sourceUrl: SOURCE_URL })}
         />
       )}
       {route === 'pairing' && (
@@ -157,8 +239,36 @@ export function App() {
           ← Back
         </button>
       )}
+      {backup.kind === 'export' && (
+        <BackupDialog
+          title="Export backup"
+          description="Choose a passphrase to encrypt your backup. You'll need it to restore on any device."
+          submitLabel="Export"
+          requireConfirm
+          busy={backup.busy}
+          error={backup.error}
+          onSubmit={(p) => void handleExport(p)}
+          onClose={() => setBackup({ kind: 'none' })}
+        />
+      )}
+      {backup.kind === 'import' && (
+        <BackupDialog
+          title="Restore backup"
+          description="Enter the passphrase used when this backup was created."
+          submitLabel="Restore"
+          requireConfirm={false}
+          busy={backup.busy}
+          error={backup.error}
+          onSubmit={(p) => void handleImport(p)}
+          onClose={() => setBackup({ kind: 'none' })}
+        />
+      )}
     </StoreProvider>
   );
+}
+
+function errMsg(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
 }
 
 async function teardown(r: Ready): Promise<void> {

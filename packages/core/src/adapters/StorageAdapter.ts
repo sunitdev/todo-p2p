@@ -23,6 +23,14 @@ export interface StorageAdapter {
   loadTrustedPeers(): Promise<TrustedPeer[]>;
   saveTrustedPeer(peer: TrustedPeer): Promise<void>;
   removeTrustedPeer(nodeId: string): Promise<void>;
+
+  /**
+   * Device wipe (M3 / P9.6). Irreversibly clears all persisted state — the
+   * document snapshot, the change log, and the trusted-peers list — and drops
+   * the at-rest encryption key so no plaintext residue remains. There is no
+   * recovery (CLAUDE.md). Callers reload into a fresh first-run afterwards.
+   */
+  wipe(): Promise<void>;
 }
 
 export interface TrustedPeer {

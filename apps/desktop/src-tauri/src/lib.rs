@@ -7,6 +7,7 @@
 use tauri::{Emitter, Manager};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
+pub mod backup;
 pub mod iroh;
 pub mod keystore;
 pub mod migrations;
@@ -69,6 +70,9 @@ pub fn run() {
             storage::storage_load_trusted_peers,
             storage::storage_save_trusted_peer,
             storage::storage_remove_trusted_peer,
+            storage::storage_wipe,
+            backup::export_backup,
+            backup::import_backup,
         ])
         .setup(|app| {
             // Resolve the encrypted DB path under the OS app-data dir and hand it

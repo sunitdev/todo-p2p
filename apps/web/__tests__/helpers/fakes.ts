@@ -107,6 +107,10 @@ export class FakeStorage implements StorageAdapter {
   async removeTrustedPeer(nodeId: string): Promise<void> {
     this.trusted = this.trusted.filter((p) => p.nodeId !== nodeId);
   }
+  async wipe(): Promise<void> {
+    this.trusted = [];
+    this.saved = [];
+  }
 }
 
 export const tick = () => new Promise((r) => setTimeout(r, 0));

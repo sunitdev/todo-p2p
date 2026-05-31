@@ -23,6 +23,7 @@ export class PeerManager {
   /** Node ids we should keep reconnecting to (paired this session or loaded). */
   private readonly trusted = new Set<string>();
   private readonly reconnecting = new Set<string>();
+  private readonly countListeners = new Set<(count: number) => void>();
   private unsub: Unsubscribe | null = null;
   private stopped = false;
 
@@ -52,6 +53,21 @@ export class PeerManager {
     return this.live.size;
   }
 
+  /**
+   * Subscribe to live connected-peer-count changes (Settings P9.7). Fires on
+   * every connect/disconnect/reconnect so the UI reflects reality, not a stale
+   * render-time snapshot. Returns an unsubscribe.
+   */
+  onChange(cb: (count: number) => void): Unsubscribe {
+    this.countListeners.add(cb);
+    return () => this.countListeners.delete(cb);
+  }
+
+  private emitCount(): void {
+    const n = this.live.size;
+    for (const cb of this.countListeners) cb(n);
+  }
+
   /** Mark a freshly paired peer trusted so it reconnects after a drop. */
   trust(nodeId: string): void {
     this.trusted.add(nodeId);
@@ -67,10 +83,12 @@ export class PeerManager {
   private onStatus(e: PeerStatusEvent): void {
     if (e.type === 'connected') {
       this.live.set(e.peerId, this.transport.connectionTo(e.peerId));
+      this.emitCount();
       return;
     }
     // disconnected | error
     this.live.delete(e.peerId);
+    this.emitCount();
     if (!this.stopped && this.trusted.has(e.peerId)) void this.reconnect(e.peerId);
   }
 
@@ -80,8 +98,10 @@ export class PeerManager {
     try {
       const conn = await this.transport.dialTrusted(nodeId);
       // Defense in depth: the dialed id must be the one that answered.
-      if (conn.peerId === nodeId) this.live.set(conn.peerId, conn);
-      else await conn.close();
+      if (conn.peerId === nodeId) {
+        this.live.set(conn.peerId, conn);
+        this.emitCount();
+      } else await conn.close();
     } catch {
       // Peer offline. A future inbound connection or M4's backoff retries.
     } finally {

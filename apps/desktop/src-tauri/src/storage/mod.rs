@@ -167,6 +167,16 @@ fn remove_trusted_peer(conn: &Connection, node_id: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Device wipe (M3 / P9.6): clear every row, then VACUUM so freed SQLCipher
+/// pages are reclaimed (no plaintext residue lingers in the file). The DB key
+/// is deliberately kept — the caller resets the identity separately — so the
+/// now-empty encrypted DB still reopens on the next launch.
+fn wipe(conn: &Connection) -> Result<(), String> {
+    conn.execute_batch("DELETE FROM doc; DELETE FROM changes; DELETE FROM trusted_peers; VACUUM;")
+        .map_err(|e| format!("wipe: {e}"))?;
+    Ok(())
+}
+
 // ---- Tauri state + commands ----------------------------------------------
 
 /// Managed storage state. The `Connection` is `!Sync`, so it lives behind a
@@ -277,6 +287,19 @@ pub async fn storage_remove_trusted_peer(
     remove_trusted_peer(guard.as_ref().expect("conn initialized"), &node_id)
 }
 
+/// Device wipe (M3 / P9.6). Clears all persisted data and deletes the iroh
+/// device secret so the next launch mints a fresh NodeId — a brand-new identity.
+/// The SQLCipher key is kept so the now-empty DB reopens; the front-end reloads
+/// into a first-run state afterwards. Destructive + irreversible (no recovery).
+#[tauri::command]
+pub async fn storage_wipe(state: State<'_, StorageState>) -> Result<(), String> {
+    let guard = state.conn().await?;
+    wipe(guard.as_ref().expect("conn initialized"))?;
+    // New identity on next launch: drop the iroh secret (regenerated lazily).
+    keystore::delete(keystore::IROH_SECRET)?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -361,6 +384,21 @@ mod tests {
         assert_eq!(list[0].last_seen_at, 1_715_000_009_999);
 
         remove_trusted_peer(&conn, "node-abc").unwrap();
+        assert!(load_trusted_peers(&conn).unwrap().is_empty());
+    }
+
+    #[test]
+    fn wipe_clears_all_tables() {
+        let (_d, conn) = fresh();
+        save_doc(&conn, &[1, 2, 3]).unwrap();
+        append_change(&conn, &[4]).unwrap();
+        append_change(&conn, &[5]).unwrap();
+        save_trusted_peer(&conn, &sample_peer()).unwrap();
+
+        wipe(&conn).unwrap();
+
+        assert_eq!(load_doc(&conn).unwrap(), None);
+        assert!(load_changes(&conn).unwrap().is_empty());
         assert!(load_trusted_peers(&conn).unwrap().is_empty());
     }
 

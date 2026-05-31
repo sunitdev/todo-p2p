@@ -35,6 +35,8 @@ export type { PairingPayload, PairingState, PairingEvent } from "./pairing.ts";
 
 export { migrate, CURRENT_SCHEMA_VERSION } from "./migrations/index.ts";
 
+export { encryptBackup, decryptBackup, BackupError } from "./backup.ts";
+
 export type {
   StorageAdapter,
   TransportAdapter,

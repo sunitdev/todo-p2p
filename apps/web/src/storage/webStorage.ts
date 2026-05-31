@@ -19,6 +19,7 @@ export class WebStorageAdapter implements StorageAdapter {
   private constructor(
     private readonly root: FileSystemDirectoryHandle,
     private readonly key: CryptoKey,
+    private readonly keyStore: WebSecureKeyStore,
   ) {}
 
   static async open(): Promise<WebStorageAdapter> {
@@ -28,7 +29,7 @@ export class WebStorageAdapter implements StorageAdapter {
     const root = await navigator.storage.getDirectory();
     const keyStore = await WebSecureKeyStore.open();
     const key = await keyStore.docKey();
-    return new WebStorageAdapter(root, key);
+    return new WebStorageAdapter(root, key, keyStore);
   }
 
   async loadDoc(): Promise<Uint8Array | null> {
@@ -88,6 +89,15 @@ export class WebStorageAdapter implements StorageAdapter {
   async removeTrustedPeer(nodeId: string): Promise<void> {
     const current = await this.loadTrustedPeers();
     await this.writePeers(current.filter((p) => p.nodeId !== nodeId));
+  }
+
+  async wipe(): Promise<void> {
+    await this.deleteFile(DOC_FILE);
+    await this.deleteFile(CHANGES_FILE);
+    await this.deleteFile(PEERS_FILE);
+    // Drop the AEAD key last: the blobs are gone, and the next open mints a
+    // fresh key (new at-rest identity), never reusing the wiped one.
+    await this.keyStore.wipe();
   }
 
   private async writePeers(peers: TrustedPeer[]): Promise<void> {
