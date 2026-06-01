@@ -106,6 +106,10 @@ jobs:
           key: playwright-${{ runner.os }}-1.49.1
       - name: Install Playwright browsers
         run: bunx playwright install --with-deps chromium
+      # Build (wasm + vite) here so the webServer only has to `preview`,
+      # otherwise the wasm build blows the Playwright webServer startup timeout.
+      - name: Build web
+        run: bun --filter @todo-p2p/web build
       - name: Run Playwright tests
         run: bun run test:e2e
       - name: Upload Playwright traces on failure

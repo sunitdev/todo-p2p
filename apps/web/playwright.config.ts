@@ -17,10 +17,12 @@ export default defineConfig({
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
   ],
   webServer: {
-    command: 'bun run build && bun run preview',
+    // CI pre-builds the web app in a dedicated step (see ci.yml) so the wasm
+    // build doesn't eat the webServer startup budget; here we only serve it.
+    command: process.env.CI ? 'bun run preview' : 'bun run build && bun run preview',
     url: `http://localhost:${PORT}`,
     reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
+    timeout: 180_000,
     stdout: 'pipe',
     stderr: 'pipe',
   },
