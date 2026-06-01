@@ -67,6 +67,10 @@ jobs:
       - uses: jetli/wasm-pack-action@v0.4.0
       - name: Install
         run: bun install --frozen-lockfile
+      # Generates packages/iroh-wasm/pkg (incl. .d.ts) that the web typecheck
+      # imports as @todo-p2p/iroh-wasm. Must precede typecheck.
+      - name: Build wasm
+        run: bun run --filter @todo-p2p/iroh-wasm build:wasm
       - name: Typecheck
         run: bun run typecheck
       - name: Test
