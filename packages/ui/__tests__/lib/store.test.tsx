@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import { act, cleanup, render, renderHook, screen } from '@testing-library/react';
 import { StoreProvider, useStore } from '../../src/lib/store';
+import { ToastProvider } from '../../src/lib/toast';
 import { FakeEngine } from '../helpers/fakeEngine';
 
 afterEach(cleanup);
@@ -99,6 +100,35 @@ describe('StoreProvider / useStore', () => {
     }
     // happy-dom captures errors thrown during render via React error reporting.
     expect(() => render(<Consumer />)).toThrow(/StoreProvider/);
+  });
+
+  test('engine error event surfaces as a toast (guaranteed subscriber)', async () => {
+    const engine = new FakeEngine();
+    render(
+      <ToastProvider>
+        <StoreProvider engine={engine.asEngine()}>
+          <span>x</span>
+        </StoreProvider>
+      </ToastProvider>,
+    );
+    expect(screen.queryByRole('alert')).toBeNull();
+    await act(async () => {
+      engine.injectError('save');
+    });
+    expect(screen.getByRole('alert')).toHaveTextContent("Couldn't save your changes");
+  });
+
+  test('engine error without a ToastProvider does not throw', async () => {
+    const engine = new FakeEngine();
+    render(
+      <StoreProvider engine={engine.asEngine()}>
+        <span>x</span>
+      </StoreProvider>,
+    );
+    await act(async () => {
+      engine.injectError('apply');
+    });
+    // No assertion beyond "no throw" — useToastOptional returns null here.
   });
 
   test('remote change triggers re-render', async () => {

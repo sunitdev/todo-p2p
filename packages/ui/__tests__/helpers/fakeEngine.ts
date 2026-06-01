@@ -41,6 +41,11 @@ export class FakeEngine {
     for (const l of this.listeners) l({ kind: 'remote-change', peerId, bytes });
   }
 
+  /** Test helper: simulate a SyncEngine error event (M4 E4.2). */
+  injectError(phase: 'load' | 'apply' | 'send' | 'save', message = 'boom') {
+    for (const l of this.listeners) l({ kind: 'error', error: new Error(message), phase });
+  }
+
   /** Type assertion to plug into `<StoreProvider engine={...}>`. */
   asEngine(): SyncEngine {
     return this as unknown as SyncEngine;

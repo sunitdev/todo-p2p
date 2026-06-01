@@ -16,9 +16,12 @@ import {
   Settings,
   StoreProvider,
   Unsupported,
+  useToast,
+  type ToastApi,
 } from '@todo-p2p/ui';
 import { createRuntime } from './runtime/createRuntime';
 import { PeerManager } from './runtime/peerManager';
+import { installGlobalErrorHandlers } from './runtime/globalErrors';
 import { PairingController } from './runtime/pairingController';
 import { saveBackupFile, openBackupFile } from './runtime/backupFile';
 import { BackupDialog } from './components/BackupDialog';
@@ -58,6 +61,43 @@ function useTauriQuickEntryBridge(): void {
   }, []);
 }
 
+/**
+ * Tauri bridge-error surface (M4 E4.4). The desktop backend emits `bridge-error`
+ * when an OS-level wiring step fails (e.g. global-shortcut registration) instead
+ * of dying in stderr. We turn it into a toast. No-op on web.
+ */
+function useTauriBridgeErrors(notify: ToastApi['notify']): void {
+  useEffect(() => {
+    const g = globalThis as { __TAURI_INTERNALS__?: unknown };
+    if (!g.__TAURI_INTERNALS__) return;
+    let unlisten: (() => void) | null = null;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { listen } = await import('@tauri-apps/api/event');
+        if (cancelled) return;
+        unlisten = await listen<{ kind: string; message: string }>('bridge-error', (e) => {
+          notify({ level: 'error', message: bridgeErrorMessage(e.payload) });
+        });
+      } catch {
+        // Bridge unavailable (no Tauri runtime) — nothing to surface.
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (unlisten) unlisten();
+    };
+  }, [notify]);
+}
+
+/** Map a desktop bridge-error payload to user copy (no internals leaked). */
+function bridgeErrorMessage(payload: { kind: string; message: string }): string {
+  if (payload.kind === 'shortcut-register') {
+    return 'Global keyboard shortcut unavailable (another app may own it). The in-app shortcut still works.';
+  }
+  return 'A desktop integration failed to start.';
+}
+
 type Route = 'home' | 'pairing' | 'settings' | 'unsupported';
 
 interface Ready {
@@ -87,16 +127,34 @@ export function App() {
   const [route, setRoute] = useState<Route>('home');
   const [backup, setBackup] = useState<BackupUi>({ kind: 'none' });
   const [pairedCount, setPairedCount] = useState(0);
+  const [reconnecting, setReconnecting] = useState(0);
+  const { notify } = useToast();
 
   useTauriQuickEntryBridge();
+  useTauriBridgeErrors(notify);
+
+  // Surface otherwise-silent background failures (M4 E4.1).
+  useEffect(() => installGlobalErrorHandlers(notify), [notify]);
 
   // Keep the Settings peer count live (P9.7): seed it, then track every
-  // connect/disconnect via the PeerManager observer.
+  // connect/disconnect via the PeerManager observer. M4 E4.3: also track
+  // per-peer reconnect state — toast on (re)connect, count peers reconnecting.
   useEffect(() => {
     if (state.kind !== 'ready') return;
     setPairedCount(state.peers.count());
-    return state.peers.onChange(setPairedCount);
-  }, [state]);
+    const offCount = state.peers.onChange(setPairedCount);
+    const inFlight = new Set<string>();
+    const offStatus = state.peers.onStatus(({ peerId, state: s }) => {
+      if (s === 'reconnecting') inFlight.add(peerId);
+      else inFlight.delete(peerId);
+      setReconnecting(inFlight.size);
+      if (s === 'connected') notify({ level: 'info', message: 'Device connected.' });
+    });
+    return () => {
+      offCount();
+      offStatus();
+    };
+  }, [state, notify]);
 
   useEffect(() => {
     if (!isTauri() && !hasWebTransport()) {
@@ -213,6 +271,7 @@ export function App() {
         <Settings
           device={{ name: 'This device', id: shortId(state.nodeId) }}
           pairedCount={pairedCount}
+          reconnecting={reconnecting}
           version="0.0.0-dev"
           onPairNew={() => setRoute('pairing')}
           onExportBackup={() => setBackup({ kind: 'export', busy: false, error: null })}

@@ -16,6 +16,8 @@ import { cn } from '../lib/cn';
 export interface SettingsProps {
   device: { name: string; id: string };
   pairedCount: number;
+  /** Number of trusted peers currently attempting to reconnect (M4 E4.3). */
+  reconnecting?: number;
   version: string;
   onPairNew: () => void;
   onExportBackup: () => void;
@@ -33,6 +35,7 @@ export interface SettingsProps {
 export function Settings({
   device,
   pairedCount,
+  reconnecting = 0,
   version,
   onPairNew,
   onExportBackup,
@@ -75,6 +78,14 @@ export function Settings({
               title="Paired devices"
               trailing={<span className="tabular-nums">{pairedCount}</span>}
             />
+            {reconnecting > 0 && (
+              <Row
+                title="Reconnecting…"
+                trailing={
+                  <span className="tabular-nums text-label-tertiary">{reconnecting}</span>
+                }
+              />
+            )}
             <Row title="Pair new…" onClick={onPairNew} />
           </Section>
 

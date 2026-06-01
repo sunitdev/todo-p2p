@@ -18,6 +18,7 @@ import type {
   Todo,
 } from '@todo-p2p/core';
 import { newId } from './id';
+import { useToastOptional } from './toast';
 
 export type TodoPatch = Partial<
   Pick<
@@ -73,6 +74,20 @@ export interface StoreValue {
 
 const StoreCtx = createContext<StoreValue | null>(null);
 
+/** Human copy for a SyncEngine error phase (M4 E4.2). No secrets/internals. */
+function syncErrorMessage(phase: 'load' | 'apply' | 'send' | 'save'): string {
+  switch (phase) {
+    case 'load':
+      return "Couldn't load your data from this device.";
+    case 'save':
+      return "Couldn't save your changes to this device.";
+    case 'apply':
+      return 'Received an update that could not be applied.';
+    case 'send':
+      return "Couldn't sync a change to a paired device.";
+  }
+}
+
 export function StoreProvider({
   engine,
   peers,
@@ -87,17 +102,23 @@ export function StoreProvider({
   children: ReactNode;
 }) {
   const [version, setVersion] = useState(0);
+  const toast = useToastOptional();
 
+  // The guaranteed SyncEngine subscriber (M4 E4.2): re-render on data changes,
+  // and surface engine errors as a toast so no failure dies silently. Optional
+  // toast keeps this usable in standalone tests with no <ToastProvider>.
   useEffect(() => {
     const off = engine.on((e) => {
       if (e.kind === 'local-change' || e.kind === 'remote-change') {
         setVersion((v) => v + 1);
+      } else if (e.kind === 'error') {
+        toast?.notify({ level: 'error', message: syncErrorMessage(e.phase) });
       }
     });
     return () => {
       off();
     };
-  }, [engine]);
+  }, [engine, toast]);
 
   const commit = useCallback(
     async (change: Uint8Array) => {

@@ -33,7 +33,7 @@ blake3 = "1"            # 6-word pairing fingerprint, byte-identical to TS @nobl
 dashmap = "6"           # live peer-connection + pairing-ticket registries
 rand = "0.8"            # OsRng: per-ticket pre-shared key + (M1) ephemeral node secret
 hex = "0.4"             # node-id / psk-hash string encoding shared with the QR payload
-tokio = { version = "1", features = ["sync", "macros"] }  # Mutex; Tauri supplies the runtime
+tokio = { version = "1", features = ["sync", "macros", "time"] }  # Mutex + deferred bridge-error emit; Tauri supplies the runtime
 
 # M2 — desktop native persistence (E2.x).
 # `automerge` reads/writes the same columnar storage format as @automerge/automerge

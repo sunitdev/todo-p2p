@@ -16,6 +16,9 @@ export type {
 export { SyncEngine } from "./syncEngine.ts";
 export type { SyncEvent } from "./syncEngine.ts";
 
+export { Backoff } from "./backoff.ts";
+export type { BackoffOptions } from "./backoff.ts";
+
 export {
   generateIdentity,
   sign,

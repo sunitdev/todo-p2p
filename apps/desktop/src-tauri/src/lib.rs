@@ -26,6 +26,13 @@ fn quick_entry_shortcut() -> Shortcut {
     Shortcut::new(Some(mods), Code::Space)
 }
 
+/// Payload for the `bridge-error` event (M4 E4.4): an OS-level wiring failure the
+/// front-end surfaces as a toast instead of letting it die in stderr. Pure so it
+/// is unit-testable without a running app.
+pub(crate) fn bridge_error_payload(kind: &str, message: &str) -> serde_json::Value {
+    serde_json::json!({ "kind": kind, "message": message })
+}
+
 /// Build and run the Tauri application. Called by `main.rs`.
 pub fn run() {
     let shortcut = quick_entry_shortcut();
@@ -91,15 +98,40 @@ pub fn run() {
             }
 
             // Register the shortcut after the plugin is installed. A failure
-            // here typically means another running app already owns the combo —
-            // we surface the error to stderr (never to the user) and let the
-            // window-focused fallback continue to work.
+            // here typically means another running app already owns the combo.
+            // M4 E4.4: besides the stderr log, emit `bridge-error` so the UI can
+            // toast it; the window-focused fallback continues to work regardless.
+            // The emit is deferred — the webview isn't subscribed yet at setup —
+            // so it lands once the front-end's listener is up.
             let shortcut = quick_entry_shortcut();
             if let Err(e) = app.global_shortcut().register(shortcut) {
-                eprintln!("[quick-entry] global shortcut registration failed: {e}");
+                let msg = format!("global shortcut registration failed: {e}");
+                eprintln!("[quick-entry] {msg}");
+                let handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+                    let _ = handle.emit(
+                        "bridge-error",
+                        bridge_error_payload("shortcut-register", &msg),
+                    );
+                });
             }
             Ok(())
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::bridge_error_payload;
+
+    #[test]
+    fn bridge_error_payload_has_kind_and_message() {
+        let v = bridge_error_payload("shortcut-register", "boom");
+        assert_eq!(v["kind"], "shortcut-register");
+        assert_eq!(v["message"], "boom");
+        // Object shape the front-end's `listen<{kind, message}>` expects.
+        assert!(v.is_object());
+    }
 }

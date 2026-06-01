@@ -6,6 +6,11 @@ export type { SettingsProps } from './screens/Settings';
 export { Unsupported } from './screens/Unsupported';
 export type { UnsupportedProps } from './screens/Unsupported';
 export { cn } from './lib/cn';
+export { ErrorBoundary } from './components/ErrorBoundary';
+export { ToastViewport } from './components/Toast';
+export type { ToastItem, ToastLevel } from './components/Toast';
+export { ToastProvider, useToast, useToastOptional } from './lib/toast';
+export type { ToastApi } from './lib/toast';
 export { StoreProvider, useStore } from './lib/store';
 export type { StoreValue, BulkTodoPatch, TodoPatch, TodoInput } from './lib/store';
 export {

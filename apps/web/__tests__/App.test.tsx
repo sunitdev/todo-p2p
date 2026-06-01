@@ -1,8 +1,18 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { ToastProvider } from '@todo-p2p/ui';
 import { App, ErrorScreen, Splash, hasWebTransport, isTauri } from '../src/App';
 
 afterEach(cleanup);
+
+/** App reads `useToast`, so it must render under a ToastProvider (as in main.tsx). */
+function renderApp() {
+  return render(
+    <ToastProvider>
+      <App />
+    </ToastProvider>,
+  );
+}
 
 describe('App splash/error views', () => {
   test('Splash renders loading label', () => {
@@ -60,7 +70,7 @@ describe('App routing on unsupported browser', () => {
   });
 
   test('renders Unsupported when WebTransport missing, skips engine init', async () => {
-    render(<App />);
+    renderApp();
     await waitFor(() =>
       expect(screen.getByText('Browser not supported')).toBeInTheDocument(),
     );
@@ -73,7 +83,7 @@ describe('App routing on unsupported browser', () => {
     const originalTauri = g.__TAURI_INTERNALS__;
     g.__TAURI_INTERNALS__ = {};
     try {
-      render(<App />);
+      renderApp();
       // Engine init proceeds; Unsupported never mounts.
       await waitFor(() => {
         expect(screen.queryByText('Browser not supported')).toBeNull();
