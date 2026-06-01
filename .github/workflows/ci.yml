@@ -56,6 +56,15 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: '1.3'
+      # Web build runs build:wasm (wasm-pack -> packages/iroh-wasm). Ubuntu's
+      # distro clang already targets wasm32, so leave CC unset (see build-wasm.sh).
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: packages/iroh-wasm
+      - uses: jetli/wasm-pack-action@v0.4.0
       - name: Install
         run: bun install --frozen-lockfile
       - name: Typecheck
@@ -75,6 +84,15 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: '1.3'
+      # Playwright webServer builds the web app, which runs build:wasm
+      # (wasm-pack -> packages/iroh-wasm). Same toolchain as the js job.
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: packages/iroh-wasm
+      - uses: jetli/wasm-pack-action@v0.4.0
       - name: Install
         run: bun install --frozen-lockfile
       - name: Cache Playwright browsers
