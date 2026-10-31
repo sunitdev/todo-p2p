@@ -3,7 +3,8 @@
 Status: selected direction from the vault notes, documented on 2026-10-31.
 Nothing described below has been implemented or verified in this application.
 See the [stack decision](../decisions/0001-native-lan-only-stack.md) and
-[validation roadmap](../roadmap.md).
+`Detailed Roadmap` in the Todo P2P Obsidian vault for validation steps.
+See also the [dependency selection](../decisions/0002-automerge-dependency-selection.md).
 
 ## Components and ownership
 
