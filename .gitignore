@@ -1,0 +1,26 @@
+# macOS metadata
+.DS_Store
+._*
+.AppleDouble
+.LSOverride
+
+# Swift Package Manager output
+.build/
+
+# Xcode build output
+build/
+DerivedData/
+*.xcarchive
+*.dSYM/
+*.dSYM.zip
+*.xcresult/
+*.ipa
+
+# Xcode user state
+xcuserdata/
+*.xcuserstate
+*.xccheckout
+*.xcscmblueprint
+
+# Agent-based files
+AGENTS.md
