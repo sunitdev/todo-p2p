@@ -1,6 +1,6 @@
 # Development environment
 
-Observed: 2026-10-31. Roadmap step 01 inventory only; no application build,
+Observed: 2026-10-31. The inventory below records roadmap step 01; no application build,
 dependency compatibility, provisioning or device deployment has been verified.
 
 ## Host and selected toolchain
@@ -81,7 +81,61 @@ unverified. No private keys were inspected or signing settings changed.
 
 Step 01 inventory evidence is complete. Subsequent source-based dependency,
 deployment-target and test-framework choices are recorded in
-[decision 0002](decisions/0002-automerge-dependency-selection.md). No source, manifests, projects,
+[decision 0002](decisions/0002-automerge-dependency-selection.md). During step 01, no source, manifests, projects,
 dependencies or placeholders were added; no builds, tests, commits or publishing
 were performed. See `Detailed Roadmap` in the Todo P2P Obsidian vault for the next separately
 scoped step.
+
+## Shared package build — 2026-10-31
+
+Completed only roadmap step 03 in `/Users/sunit/Workspace/Personal/Projects/todo-p2p`.
+The checkout was clean before editing. `Packages/TodoP2PCore/Package.swift`
+declares one automatic `TodoP2PCore` library product and one regular source target
+of the same name, with no dependencies or test targets. Its sole source,
+`Sources/TodoP2PCore/TodoP2PCore.swift`, contains only `import Swift`; it declares
+no API or behavior. Domain/Persistence/Sync/Pairing remain empty local directories
+without placeholders.
+
+Settings: `// swift-tools-version: 6.4`, `swiftLanguageModes: [.v6]`,
+`.macOS("27.0")` and `.iOS("27.0")`. Tools 6.4 matches the selected compiler and
+manifest API; explicit Swift 6 mode avoids relying on an implicit default. This
+is separate from upstream Automerge packages' tools 5.9 / default Swift 5 mode.
+
+Commands run from the checkout:
+
+```sh
+xcrun swift --version
+xcrun swift package --package-path Packages/TodoP2PCore dump-package
+xcrun swift build --package-path Packages/TodoP2PCore
+```
+
+Version returned exit 0: Apple Swift 6.4 (`swiftlang-6.4.0.34.1
+clang-2100.3.34.1`), driver 1.168.6, target `arm64-apple-macosx27.0.0`.
+The first sandboxed `dump-package` exited 1. SwiftPM warned that its user
+configuration, security and cache directories were inaccessible or unwritable,
+and reported `You don’t have permission to save the file “manifests” in the folder
+“org.swift.swiftpm”.` The manifest compiler then reported:
+
+```text
+<unknown>:0: error: error opening '/Users/sunit/.cache/clang/ModuleCache/Swift-7JL1KBZ3A6V3.swiftmodule' for output: /Users/sunit/.cache/clang/ModuleCache: Operation not permitted
+<unknown>:0: error: unable to load standard library for target 'arm64-apple-macosx14.0'
+```
+
+The final diagnostic was `error: invalid manifests at
+[<AbsolutePath:"/Users/sunit/Workspace/Personal/Projects/todo-p2p/Packages/TodoP2PCore">]`.
+An approved retry of the same command exited 0. Inspected JSON confirmed tools
+6.4.0, language version 6, macOS/iOS 27.0, one library/regular target and empty
+dependency lists. The diagnostic's macOS 14.0 target was the manifest compiler
+invocation, not a change to the library deployment minimum.
+
+The build ran with approved cache and checkout write access and exited 0,
+showing `TodoP2PCore` compilation and `Build complete! (2.58 secs)`.
+All 76 generated build files were verified ignored by `.gitignore`'s `.build/`
+rule; no `Package.resolved` was generated. No toolchain or deployment target was
+changed to work around permissions.
+
+This validates the dependency-free library on the macOS host only. iOS compilation,
+simulator/device execution, app linkage, signing, tests and Automerge compatibility
+remain unverified. No external dependencies were added or resolved. Core 0.7.2
+and wrapper 0.3.2 integration remains in steps 06/07; bundled Swift Testing is
+selected for future tests, without a package dependency. Step 04 has not begun.

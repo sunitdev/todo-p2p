@@ -26,9 +26,9 @@ These documents summarize the Obsidian notes `Todo P2P`, `Project Stack`,
 long-term record of findings and decisions; local repository working instructions
 live in `AGENTS.md`, which is excluded from version control.
 
-The repository contains a folder scaffold and documentation only. The architecture
-is selected, not implemented or tested. There are no Swift sources, package
-manifests, Xcode targets, configured dependencies or runnable tests. Build and
-runtime setup remain deferred. Decision 0002 records source-based dependency
-selection against the observed environment. Resolution, compilation and runtime compatibility remain unverified.
-The next vault roadmap action is step 03; this documentation task stops before it.
+The repository contains a minimal `TodoP2PCore` package with one import-only Swift
+source and a successful macOS host build; see [setup](setup.md#shared-package-build--2026-10-31).
+The product architecture remains planned. There are no app targets, configured
+external dependencies or runnable tests. Decision 0002 records source-based
+dependency selection; Automerge resolution, compilation and runtime compatibility
+remain unverified. The next vault roadmap action is step 04; it has not begun.
