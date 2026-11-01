@@ -5,8 +5,9 @@ independently offline, store data locally and synchronize with its paired device
 over the LAN using Bonjour discovery and TLS. No backend or cloud services are
 planned.
 
-The repository contains a minimal, buildable `TodoP2PCore` Swift library.
-Application behavior, app targets and tests remain unimplemented.
+The repository contains a minimal, buildable `TodoP2PCore` Swift library and a
+macOS SwiftUI app shell with a verified blank window. Product behavior and tests
+remain unimplemented.
 
 ## Planned stack
 
@@ -36,9 +37,9 @@ retain these directories once they contain tracked files.
 
 ## Deferred setup
 
-Application implementation, Xcode targets, external dependency configuration and
-resolution, permissions, signing and tests remain deferred. No external
-dependencies are configured. Automerge core 0.7.2 and wrapper 0.3.2 are selected
+Product implementation, the iOS target, external dependency configuration and
+resolution, network permissions, device signing and tests remain deferred.
+No external dependencies are configured. Automerge core 0.7.2 and wrapper 0.3.2 are selected
 for later integration; future tests will use bundled Swift Testing.
 
 ## Shared package
@@ -54,3 +55,21 @@ xcrun swift build --package-path Packages/TodoP2PCore
 The macOS host build passed on 2026-10-31 with Xcode 27.1 / Apple Swift 6.4.
 This does not validate iOS compilation, simulator/device execution or Automerge
 compatibility. See [setup](docs/setup.md) for verification and permission details.
+
+## macOS app shell
+
+Open `TodoP2P.xcodeproj` and select the shared `TodoP2PMac` scheme, or run:
+
+```sh
+xcodebuild -project TodoP2P.xcodeproj -scheme TodoP2PMac -configuration Debug \
+  -destination 'platform=macOS,arch=arm64' -derivedDataPath DerivedData \
+  CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual build
+open DerivedData/Build/Products/Debug/TodoP2PMac.app
+```
+
+The app imports and links the repository-relative local `TodoP2PCore` product.
+It uses macOS 27.0, Swift 6, generated Info.plist metadata and local development
+bundle identifier `local.sunit.TodoP2PMac`, with ad hoc signing and no team.
+Build and visible blank-window checks passed on 2026-11-01 using the then-selected
+Xcode 27.2 / Swift 6.4.2. See [setup](docs/setup.md#macos-app-shell--2026-11-01)
+for exact verification, permission retries and remaining limits.

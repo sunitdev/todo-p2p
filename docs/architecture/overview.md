@@ -1,7 +1,9 @@
 # Planned architecture
 
 Status: selected direction from the vault notes, documented on 2026-10-31.
-Nothing described below has been implemented or verified in this application.
+The dependency-free shared package and macOS blank-window shell are built and
+verified; see [setup](../setup.md#macos-app-shell--2026-11-01). Product behavior
+described below remains planned and unverified.
 See the [stack decision](../decisions/0001-native-lan-only-stack.md) and
 `Detailed Roadmap` in the Todo P2P Obsidian vault for validation steps.
 See also the [dependency selection](../decisions/0002-automerge-dependency-selection.md).

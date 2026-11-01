@@ -28,7 +28,9 @@ live in `AGENTS.md`, which is excluded from version control.
 
 The repository contains a minimal `TodoP2PCore` package with one import-only Swift
 source and a successful macOS host build; see [setup](setup.md#shared-package-build--2026-10-31).
-The product architecture remains planned. There are no app targets, configured
-external dependencies or runnable tests. Decision 0002 records source-based
+A macOS SwiftUI app target now builds and displays a blank window; see
+[app-shell verification](setup.md#macos-app-shell--2026-11-01). Product behavior
+remains planned. There are no configured external dependencies or runnable tests.
+Decision 0002 records source-based
 dependency selection; Automerge resolution, compilation and runtime compatibility
-remain unverified. The next vault roadmap action is step 04; it has not begun.
+remain unverified. The next vault roadmap action is step 05; it has not begun.

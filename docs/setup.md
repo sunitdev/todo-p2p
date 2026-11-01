@@ -139,3 +139,103 @@ simulator/device execution, app linkage, signing, tests and Automerge compatibil
 remain unverified. No external dependencies were added or resolved. Core 0.7.2
 and wrapper 0.3.2 integration remains in steps 06/07; bundled Swift Testing is
 selected for future tests, without a package dependency. Step 04 has not begun.
+
+## macOS app shell — 2026-11-01
+
+Completed only roadmap step 04 in `/Users/sunit/Workspace/Personal/Projects/todo-p2p`.
+Step 03 completion was confirmed from its documented successful package build,
+vault checklist and commit `05c845c`, rather than inferred from package files.
+The checkout was clean and no Xcode project existed; no unfinished step 03 work
+required coordination. Historical inventory and prompt-writing observations remain
+valid for their recorded times.
+
+Added hand-authored `TodoP2P.xcodeproj/project.pbxproj`, shared scheme
+`TodoP2P.xcodeproj/xcshareddata/xcschemes/TodoP2PMac.xcscheme` and
+`Apps/macOS/Sources/TodoP2PMacApp.swift`. There is one macOS application target,
+`TodoP2PMac`, with Debug/Release configurations. The app imports SwiftUI and
+TodoP2PCore and creates only a blank WindowGroup (480 × 320 initial/minimum content
+size). No resources, features, entitlements, external dependencies or tests were added.
+
+The project uses `XCLocalSwiftPackageReference.relativePath = Packages/TodoP2PCore`
+and links the `TodoP2PCore` product in its Frameworks phase. Package sources and
+manifest are unchanged: tools 6.4, Swift 6 mode, macOS/iOS 27.0. No package API was
+invented. Xcode also exposes the package's automatic TodoP2PCore scheme; the only
+application target/shared app scheme is TodoP2PMac.
+
+Effective Debug settings: `MACOSX_DEPLOYMENT_TARGET = 27.0`, `SWIFT_VERSION = 6.0`,
+`SUPPORTED_PLATFORMS = macosx`, `GENERATE_INFOPLIST_FILE = YES`,
+`PRODUCT_BUNDLE_IDENTIFIER = local.sunit.TodoP2PMac`, version 1.0/build 1,
+`CODE_SIGN_STYLE = Manual`, `CODE_SIGN_IDENTITY = -`. Release inherits the same
+platform, language, metadata and signing settings. This bundle ID is for local
+development, not a registered distribution identity. No team, account, certificate,
+provisioning or global settings were changed. No separate Info.plist is required.
+
+### Commands and observed outcomes
+
+Commands below ran from the source checkout unless a path is absolute:
+
+```sh
+xcode-select -p
+xcodebuild -version
+xcrun swift --version
+sw_vers
+xcodebuild -list -project TodoP2P.xcodeproj
+xcodebuild -project TodoP2P.xcodeproj -scheme TodoP2PMac -configuration Debug \
+  -destination 'platform=macOS,arch=arm64' -derivedDataPath DerivedData \
+  -showBuildSettings > /private/tmp/todo-p2p-step04-settings.log 2>&1
+xcodebuild -project TodoP2P.xcodeproj -scheme TodoP2PMac -configuration Debug \
+  -destination 'platform=macOS,arch=arm64' -derivedDataPath DerivedData \
+  CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual build \
+  > /private/tmp/todo-p2p-step04-build.log 2>&1
+open DerivedData/Build/Products/Debug/TodoP2PMac.app
+plutil -p DerivedData/Build/Products/Debug/TodoP2PMac.app/Contents/Info.plist
+codesign -dv DerivedData/Build/Products/Debug/TodoP2PMac.app
+```
+
+- Current selected path is still `/Applications/Xcode.app/Contents/Developer`.
+  It now reports Xcode 27.2 (27B52), Swift 6.4.2
+  (`swiftlang-6.4.2.1.9 clang-2100.4.1.1`), driver 1.168.6, arm64 target.
+  SDKROOT is MacOSX27.2.sdk. Host remains macOS 27.0.1 (26A434).
+  Earlier planning/inventory observed Xcode 27.1. This task did not change Xcode
+  selection or install anything; retain the earlier results as historical evidence.
+- Initial sandboxed project listing exited 74 with `You don’t have permission to
+  save the file “repositories” in the folder “SourcePackages”.` It also reported
+  denied Xcode log directories, fs event/cache warnings and simulator service errors.
+  Approved retry exited 0, resolving only TodoP2PCore at the local repository path.
+  Settings inspection and both host builds used approved cache/checkout access.
+- Settings inspection exited 0. The initial build exited 0 with
+  `** BUILD SUCCEEDED **`; package compilation and the app/package dependency graph
+  confirmed local integration. A traditional-headermap warning was resolved by
+  explicit `ALWAYS_SEARCH_USER_PATHS = NO`; the final rebuild also exited 0.
+- Xcode reports `CoreSimulator is out of date. Current version (1174.9.2) is older
+  than build version (1174.21.0).` Simulator device support is disabled. This did
+  not block the macOS build; no repair, runtime installation or iOS check was attempted.
+- `open` exited 0 with approved GUI launch access. CUA `getApp` and
+  `getAXStateAndScreenshot` directly showed a focused standard window titled
+  `TodoP2PMac` and a blank dark content area. The screenshot and accessibility
+  observation satisfy the visible-window check separately from build/launch exits.
+  The app was left running. No screenshot is added to the repository.
+- Generated plist inspection exited 0 and confirmed APPL bundle type, identifier,
+  executable and `LSMinimumSystemVersion = 27.0`. `codesign -dv` exited 0 and
+  confirmed arm64, `Signature=adhoc`, and `TeamIdentifier=not set`.
+- Computer Use skill discovery found no `orca` executable (`command not found`,
+  exit 127); the available CUA tool supplied GUI verification instead. An early
+  CUA lookup before the build completed returned invalid app; the post-launch
+  bundle-ID lookup succeeded. A temporary-script `py_compile` check failed because
+  the sandbox denied `/Users/sunit/Library/Caches/com.apple.python/private/tmp`;
+  the actual script executed successfully with approved source-checkout access.
+
+DerivedData and user-specific Xcode state remain ignored by existing rules;
+project.pbxproj and the shared scheme remain trackable. No lockfile was needed.
+This verifies only a dependency-free macOS app shell and local package integration.
+iOS, Automerge compatibility, persistence, pairing, discovery, networking and sync
+remain unverified. Step 05 is next and was not started. No commits or publishing.
+
+Final review: manually inspected the app source, project, shared scheme and
+repository documentation diff. `git diff --check` passed. A separate read-only
+check covered whitespace/newlines in all seven changed/new repository files and
+three vault notes, resolved relative repository documentation file links, parsed
+scheme XML and confirmed project/scheme trackability and generated/user-state
+ignore rules. Package diff is empty; no repository roadmap or lockfile was added.
+Final effective-settings inspection exited 0 after the header-search fix. Files
+remain unstaged and uncommitted.
