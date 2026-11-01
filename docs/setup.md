@@ -406,3 +406,58 @@ and launch the built app, and inspect its visible blank screen separately from
 command exits. No runtime download was requested and no simulator was booted,
 installed to or launched during this task. Do not lower the deployment target.
 Step 05 remains unchecked until simulator build and visible launch pass.
+
+## iOS simulator launch verified — 2026-11-01
+
+Step 05 is complete. Following explicit user authorization and approved system
+setup, `xcodebuild -downloadPlatform iOS` downloaded the arm64 iOS 27.2 Simulator
+24B8117 (8.32 GB). `simctl list runtimes` confirms
+com.apple.CoreSimulator.SimRuntime.iOS-27-2; the earlier 26.1/26.5-only inventory
+and missing-runtime blocker above are superseded. Xcode also automatically
+installed a second iOS 27.2 build, 24B91016s, in the same download operation.
+The download command exited 0; `simctl runtime list` reports both new images
+Ready. The second runtime identifier is iOS-27-2-iPhone19-4; launch evidence
+below uses the general iOS-27-2 runtime, build 24B8117. Four runtime disk images
+now total 31.2G, including the two existing images. No old runtimes were removed.
+
+Selected toolchain remains Xcode 27.2 (27B52) / Swift 6.4.2. A fresh generic
+simulator build exited 0 with `** BUILD SUCCEEDED **`; the destination listing
+now includes iPhone 17, iOS 27.2, UUID E1877D46-004A-4FBD-BE85-8C3695258F17.
+Boot and bootstatus exited 0 (first boot completed migration in 39 seconds).
+Install exited 0; launch exited 0 and returned `local.sunit.TodoP2PiOS: 65541`.
+A separately captured simulator screen was opened and visually inspected: blank
+white app content, status bar and home indicator, with no error or crash screen.
+This is rendered-screen evidence in addition to successful command exits.
+
+```sh
+xcodebuild -downloadPlatform iOS
+xcrun simctl list runtimes
+xcodebuild -project TodoP2P.xcodeproj -scheme TodoP2PiOS -showdestinations
+xcodebuild -project TodoP2P.xcodeproj -scheme TodoP2PiOS -configuration Debug \
+  -destination 'generic/platform=iOS Simulator' -derivedDataPath DerivedData/Step05 \
+  CODE_SIGNING_ALLOWED=NO build
+xcrun simctl boot E1877D46-004A-4FBD-BE85-8C3695258F17
+xcrun simctl bootstatus E1877D46-004A-4FBD-BE85-8C3695258F17
+xcrun simctl install E1877D46-004A-4FBD-BE85-8C3695258F17 \
+  DerivedData/Step05/Build/Products/Debug-iphonesimulator/TodoP2PiOS.app
+xcrun simctl launch E1877D46-004A-4FBD-BE85-8C3695258F17 local.sunit.TodoP2PiOS
+xcrun simctl io E1877D46-004A-4FBD-BE85-8C3695258F17 screenshot \
+  /private/tmp/todo-p2p-step05-ios-screen.png
+```
+
+Build/destination logs are /private/tmp/todo-p2p-step05-completion-{build,destinations}.log.
+The inspected screenshot is also retained locally in ignored
+DerivedData/Step05/Verification/ios-blank-screen.png. No generated output is
+tracked. The standalone Simulator desktop app is absent at
+/Applications/Xcode.app/Contents/Developer/Applications/Simulator.app:
+`open` returned `The file ... does not exist.` CUA app lookup also failed.
+The computer-use skill's `orca` command returned `command not found` (exit 127).
+Used `simctl io screenshot` and direct image inspection instead; no desktop
+Simulator window was claimed. Simulator services and rendered display work.
+
+No app/project/package source, dependency pin, signing account, certificate or
+provisioning changes were needed. Manifest and package-resolution SHA-256 values
+still match the earlier build evidence. The prior successful Mac regression
+result remains applicable because this follow-up changes documentation only.
+Physical-phone access, provisioning and device installation remain unverified.
+No commits or publishing were performed in this launch-verification follow-up.

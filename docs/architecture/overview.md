@@ -3,8 +3,9 @@
 Status: selected direction from the vault notes, documented on 2026-10-31.
 The shared package and macOS blank-window shell are built and verified; see
 [setup](../setup.md#macos-app-shell--2026-11-01). The iPhone blank shell also
-builds with the local package and pinned Automerge dependency, but visible launch
-needs a compatible simulator runtime; see [iOS setup](../setup.md#ios-app-shell--2026-11-01). Product behavior
+builds with the local package and pinned Automerge dependency and displays a
+verified blank screen on an iOS 27.2 simulator; see
+[iOS verification](../setup.md#ios-simulator-launch-verified--2026-11-01). Product behavior
 described below remains planned and unverified.
 See the [stack decision](../decisions/0001-native-lan-only-stack.md) and
 `Detailed Roadmap` in the Todo P2P Obsidian vault for validation steps.

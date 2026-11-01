@@ -91,6 +91,8 @@ for exact verification, permission retries and remaining limits.
 The existing project also contains the shared `TodoP2PiOS` scheme and a blank
 SwiftUI shell, linked to the same local TodoP2PCore product. It targets iPhone,
 iOS 27.0 and Swift 6 with local bundle identifier `local.sunit.TodoP2PiOS`.
-The simulator build and Mac regression build pass; visible launch is blocked
-by the absence of an iOS 27-or-newer runtime. See [iOS setup](docs/setup.md#ios-app-shell--2026-11-01)
-for commands, signing boundaries and remaining checks. Step 05 remains incomplete.
+Simulator build, installation, launch and visual blank-screen inspection passed
+on an iPhone 17 simulator running iOS 27.2. The Mac regression build also passed.
+See [iOS verification](docs/setup.md#ios-simulator-launch-verified--2026-11-01)
+for commands and evidence. Step 05 is complete; physical-device signing and
+deployment remain unverified.
