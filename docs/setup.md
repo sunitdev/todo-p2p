@@ -321,3 +321,88 @@ checks pass. No repository roadmap copy exists. Concurrent iOS source, scheme
 and project changes appeared during final review and were left untouched; this
 task neither verifies them nor changes step 05 completion. The next action stays
 at the earliest unfinished step, 05, until its owner records successful checks.
+
+## iOS app shell — 2026-11-01
+
+Step 05 configuration is added in the existing TodoP2P.xcodeproj, alongside
+TodoP2PMac: target/shared scheme TodoP2PiOS and Apps/iOS/Sources/TodoP2PiOSApp.swift.
+The source imports SwiftUI and TodoP2PCore and displays only a blank system
+background. Both configurations specify iOS 27.0, Swift 6, iPhone family 1,
+iphoneos/iphonesimulator support and no Catalyst. The target overrides the
+project's macOS SDK and clears its inherited macOS deployment setting. It reuses
+the sole Packages/TodoP2PCore local reference and links its library product.
+Existing Mac objects and its scheme are unchanged.
+
+Generated Info.plist includes scene/launch metadata; version is 1.0/build 1.
+`local.sunit.TodoP2PiOS` is a local development bundle identifier. iOS uses
+automatic signing with Apple Development identity and no team, independently of
+the Mac's manual ad hoc signing. Simulator builds disable signing on the command
+line. Physical-device provisioning, an online phone and device installation are
+unverified; no accounts, certificates or provisioning were changed.
+
+Fresh selected toolchain: /Applications/Xcode.app/Contents/Developer,
+Xcode 27.2 (27B52), Apple Swift 6.4.2 (swiftlang-6.4.2.1.9), iOS/simulator SDK
+27.2. Approved `xcrun simctl list runtimes` and `xcrun simctl list devices available`
+now exit 0 and list only iOS 26.1 (23B86) and 26.5 (23F77), with all devices
+Shutdown. No iOS 27 runtime exists in that inventory. During planning the
+sandboxed queries failed with `CoreSimulatorService connection became invalid`,
+`Connection refused` and denied log access. The approved retry printed
+`Install Started` / `Install Succeeded` for an unidentified component; a later
+approved refresh succeeded without installation output. This supersedes the
+service-mismatch diagnosis as the current query result, not the historical
+observation. A working inventory service does not prove successful app launch.
+
+Step 06 completion was confirmed before final app verification against commit
+`e4529a8` (Pin Automerge core and verify document serialization). Project listing,
+iOS destination listing and Debug/Release effective-settings commands exited 0.
+The simulator Debug build and existing Mac Debug regression build both exited 0
+with `** BUILD SUCCEEDED **`, using the commands below. The iOS dependency graph
+includes TodoP2PCore and Automerge; generated plist confirms MinimumOSVersion
+27.0, UIDeviceFamily [1], local.sunit.TodoP2PiOS, scene manifest and launch screen.
+Both builds report only `Metadata extraction skipped, no AppIntents.framework
+dependency found`; this blank shell has no App Intents.
+
+Xcode reports the exact launch blocker for the available iPhone 17 Pro:
+`iPhone 17 Pro’s iOS Simulator 26.5 doesn’t match TodoP2PiOS.app’s iOS Simulator
+27.0  deployment target.` No eligible concrete iPhone simulator exists. No
+installation, launch or visual verification was claimed from the generic build.
+Physical-device deployment was not attempted.
+
+Xcode generated project.xcworkspace/xcshareddata/swiftpm/Package.resolved, retained
+as trackable shared project resolution; its sole Automerge pin matches the
+package-owned 0.7.2 revision aa45d17ac92cef2b8ded63b47e65a28dc85e3418. Existing
+package pins, manifest and tests were not changed. Manifest SHA-256 before/after:
+707757098803f4021c5ee58449c3ad53546f8f05626ce799f9562c898946163b; package
+resolution SHA-256: f76a0ede2878c8330966b43f16e940303d5c5e30b38a2b380fc8e424df3af392.
+Logs are /private/tmp/todo-p2p-step05-{list,destinations,debug,release,ios-build,mac-build}.log.
+The package manifest, pins and tests are owned by that work and were not edited.
+Static review passes: project plist syntax, both scheme XML files, unchanged Mac
+objects, exactly one local package reference, trackable project/shared scheme/
+source files, ignored DerivedData, and git diff --check.
+
+Run after coordination, from the repository root:
+
+```sh
+xcodebuild -list -project TodoP2P.xcodeproj
+xcodebuild -project TodoP2P.xcodeproj -scheme TodoP2PiOS -showdestinations
+xcodebuild -project TodoP2P.xcodeproj -scheme TodoP2PiOS -configuration Debug \
+  -destination 'generic/platform=iOS Simulator' -derivedDataPath DerivedData/Step05 \
+  -showBuildSettings
+xcodebuild -project TodoP2P.xcodeproj -scheme TodoP2PiOS -configuration Release \
+  -destination 'generic/platform=iOS Simulator' -derivedDataPath DerivedData/Step05 \
+  -showBuildSettings
+xcodebuild -project TodoP2P.xcodeproj -scheme TodoP2PiOS -configuration Debug \
+  -destination 'generic/platform=iOS Simulator' -derivedDataPath DerivedData/Step05 \
+  CODE_SIGNING_ALLOWED=NO build
+xcodebuild -project TodoP2P.xcodeproj -scheme TodoP2PMac -configuration Debug \
+  -destination 'platform=macOS,arch=arm64' -derivedDataPath DerivedData/Step05 \
+  CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual build
+```
+
+Required remaining setup is a compatible iOS 27-or-newer simulator runtime through
+Xcode Settings > Components, using the environment's approval process for any
+setup/download. Recheck destinations afterward; boot a compatible iPhone, install
+and launch the built app, and inspect its visible blank screen separately from
+command exits. No runtime download was requested and no simulator was booted,
+installed to or launched during this task. Do not lower the deployment target.
+Step 05 remains unchecked until simulator build and visible launch pass.

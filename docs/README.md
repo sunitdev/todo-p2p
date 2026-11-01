@@ -34,7 +34,11 @@ remains planned. Automerge core 0.7.2 is pinned at
 `aa45d17ac92cef2b8ded63b47e65a28dc85e3418`; resolution, host compilation and
 one isolated serialization/reload test pass with bundled Swift Testing. See
 [step 06 verification](setup.md#automerge-core-integration--2026-11-01) for APIs,
-commands and permission retries. iOS compatibility, durable storage, convergence
+commands and permission retries. iOS runtime behavior, durable storage, convergence
 and synchronization remain unverified; automerge-repo-swift is deferred.
-The next vault roadmap action remains step 05; concurrent iOS target work is
-owned and verified separately.
+The next vault roadmap action remains step 05; its build and remaining launch
+checks are recorded below.
+
+The `TodoP2PiOS` target and shared scheme are configured in the same project.
+See [iOS app-shell status](setup.md#ios-app-shell--2026-11-01) for successful iOS/Mac
+build checks and the missing compatible simulator runtime. Step 05 remains unchecked.

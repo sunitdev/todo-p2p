@@ -85,3 +85,12 @@ bundle identifier `local.sunit.TodoP2PMac`, with ad hoc signing and no team.
 Build and visible blank-window checks passed on 2026-11-01 using the then-selected
 Xcode 27.2 / Swift 6.4.2. See [setup](docs/setup.md#macos-app-shell--2026-11-01)
 for exact verification, permission retries and remaining limits.
+
+## iPhone app shell
+
+The existing project also contains the shared `TodoP2PiOS` scheme and a blank
+SwiftUI shell, linked to the same local TodoP2PCore product. It targets iPhone,
+iOS 27.0 and Swift 6 with local bundle identifier `local.sunit.TodoP2PiOS`.
+The simulator build and Mac regression build pass; visible launch is blocked
+by the absence of an iOS 27-or-newer runtime. See [iOS setup](docs/setup.md#ios-app-shell--2026-11-01)
+for commands, signing boundaries and remaining checks. Step 05 remains incomplete.
