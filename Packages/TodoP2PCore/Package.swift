@@ -12,18 +12,23 @@ let package = Package(
         .library(name: "TodoP2PCore", targets: ["TodoP2PCore"])
     ],
     dependencies: [
-        .package(url: "https://github.com/automerge/automerge-swift", exact: "0.7.2")
+        .package(url: "https://github.com/automerge/automerge-swift", exact: "0.7.2"),
+        .package(url: "https://github.com/automerge/automerge-repo-swift", exact: "0.3.2")
     ],
     targets: [
         .target(
             name: "TodoP2PCore",
-            dependencies: [.product(name: "Automerge", package: "automerge-swift")]
+            dependencies: [
+                .product(name: "Automerge", package: "automerge-swift"),
+                .product(name: "AutomergeRepo", package: "automerge-repo-swift")
+            ]
         ),
         .testTarget(
             name: "TodoP2PCoreTests",
             dependencies: [
                 "TodoP2PCore",
-                .product(name: "Automerge", package: "automerge-swift")
+                .product(name: "Automerge", package: "automerge-swift"),
+                .product(name: "AutomergeRepo", package: "automerge-repo-swift")
             ]
         )
     ],
