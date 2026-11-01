@@ -6,8 +6,8 @@ over the LAN using Bonjour discovery and TLS. No backend or cloud services are
 planned.
 
 The repository contains a minimal, buildable `TodoP2PCore` Swift library and a
-macOS SwiftUI app shell with a verified blank window. Product behavior and tests
-remain unimplemented.
+macOS SwiftUI app shell with a verified blank window. Product behavior remains
+unimplemented. An isolated Automerge serialization test passes on the macOS host.
 
 ## Planned stack
 
@@ -27,7 +27,7 @@ remain unimplemented.
 | `Packages/TodoP2PCore/Sources/TodoP2PCore/Persistence/` | Local durable storage |
 | `Packages/TodoP2PCore/Sources/TodoP2PCore/Sync/` | Paired LAN synchronization |
 | `Packages/TodoP2PCore/Sources/TodoP2PCore/Pairing/` | Device pairing and trust |
-| `Packages/TodoP2PCore/Tests/TodoP2PCoreTests/` | Future shared-package tests |
+| `Packages/TodoP2PCore/Tests/TodoP2PCoreTests/` | Shared-package integration tests |
 | `Tests/Integration/` | Future integration tests |
 | `docs/architecture/` | Architecture documentation |
 | `docs/decisions/` | Decision records |
@@ -37,10 +37,10 @@ retain these directories once they contain tracked files.
 
 ## Deferred setup
 
-Product implementation, the iOS target, external dependency configuration and
-resolution, network permissions, device signing and tests remain deferred.
-No external dependencies are configured. Automerge core 0.7.2 and wrapper 0.3.2 are selected
-for later integration; future tests will use bundled Swift Testing.
+Product implementation, iOS validation, network permissions and device signing
+remain deferred. Automerge core 0.7.2 is pinned and tested on the macOS host;
+automerge-repo-swift 0.3.2 remains selected for later integration. Tests use
+bundled Swift Testing.
 
 ## Shared package
 
@@ -53,8 +53,20 @@ xcrun swift build --package-path Packages/TodoP2PCore
 ```
 
 The macOS host build passed on 2026-10-31 with Xcode 27.1 / Apple Swift 6.4.
-This does not validate iOS compilation, simulator/device execution or Automerge
-compatibility. See [setup](docs/setup.md) for verification and permission details.
+That dependency-free result is historical. On 2026-11-01, resolution, build and
+one Automerge serialization/reload test passed with Xcode 27.2 / Swift 6.4.2.
+`Package.resolved` retains core 0.7.2 at
+`aa45d17ac92cef2b8ded63b47e65a28dc85e3418`, with no additional package pins.
+
+```sh
+xcrun swift package --package-path Packages/TodoP2PCore resolve
+xcrun swift test --package-path Packages/TodoP2PCore
+```
+
+Keep `LOCAL_BUILD` unset to use the released binary artifact. Host success does
+not validate iOS compatibility, durable storage, convergence or synchronization.
+See [setup](docs/setup.md#automerge-core-integration--2026-11-01) for APIs,
+verification and permission details.
 
 ## macOS app shell
 

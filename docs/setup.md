@@ -239,3 +239,85 @@ scheme XML and confirmed project/scheme trackability and generated/user-state
 ignore rules. Package diff is empty; no repository roadmap or lockfile was added.
 Final effective-settings inspection exited 0 after the header-search fix. Files
 remain unstaged and uncommitted.
+
+## Automerge core integration — 2026-11-01
+
+Completed roadmap step 06 in `/Users/sunit/Workspace/Personal/Projects/todo-p2p`.
+Rechecked decision 0002 and the vault selection before editing. The checkout was
+clean at implementation start, following macOS shell commit `fb3f7a1`; app/project
+files and existing app evidence were preserved. This task owns package dependencies,
+resolution and package tests and does not depend on app-target completion.
+
+`Packages/TodoP2PCore/Package.swift` now requires
+`https://github.com/automerge/automerge-swift` at exact version `0.7.2`.
+Retained package-level `Package.resolved` pins only `automerge-swift`, at full
+revision `aa45d17ac92cef2b8ded63b47e65a28dc85e3418`; the resolved checkout HEAD
+matches. There are no additional Swift package dependencies to review. The
+upstream manifest's `Automerge` library product includes `Automerge` and
+`AutomergeUtilities`; this product is linked to the core and test targets.
+Tools 6.4, explicit Swift 6 mode and macOS/iOS 27.0 minimums are unchanged.
+Upstream retains its own tools 5.9/default Swift 5 language settings.
+
+`LOCAL_BUILD` was absent (`printenv LOCAL_BUILD`: no output, exit 1). Upstream
+checks presence, so even an empty value would select a local XCFramework and
+extra unsafe concurrency flags. SwiftPM downloaded the normal released
+`https://github.com/automerge/automerge-swift/releases/download/0.7.2/automergeFFI.xcframework.zip`
+(54.3 MB), using manifest checksum
+`10245378e74229b026f689b039d7df3cf17aeed353706d5f420dfd164f283a86`.
+No Rust build or toolchain installation was needed.
+
+Added `Tests/TodoP2PCoreTests/AutomergeRoundTripTests.swift` beneath the package,
+using bundled `Testing`, with no external swift-testing dependency. The single
+`documentSerializationRoundTrip()` probe creates `Document()`, writes synthetic
+`.String("round-trip-value")` at `ObjId.ROOT` / key `"probe"` via
+`put(obj:key:value:)`, serializes with `save() -> Data`, checks nonempty bytes,
+constructs a distinct object with `try Document(bytes)`, and asserts
+`get(obj:key:) -> Value?` equals `.Scalar(.String("round-trip-value"))`.
+Pinned `Sources/Automerge/{Document,Value,ScalarValue,ObjId}.swift` and the manifest
+were inspected rather than borrowing README examples. The test has no app storage,
+networking, workspace schema or production wrapper; the core source stays import-only.
+
+Commands from the checkout, with selected Xcode 27.2 (27B52), Apple Swift 6.4.2
+(`swiftlang-6.4.2.1.9 clang-2100.4.1.1`), driver 1.168.6:
+
+```sh
+xcrun swift package --package-path Packages/TodoP2PCore resolve
+xcrun swift build --package-path Packages/TodoP2PCore
+xcrun swift test --package-path Packages/TodoP2PCore
+```
+
+- Initial sandboxed resolve exited 1. SwiftPM warned that user configuration,
+  security and cache directories were inaccessible or unwritable. Manifest compilation
+  reported `error opening '/Users/sunit/.cache/clang/ModuleCache/Swift-18Y2CYADWFGX0.swiftmodule' for output: /Users/sunit/.cache/clang/ModuleCache: Operation not permitted`
+  and `unable to load standard library for target 'arm64-apple-macosx14.0'`.
+  This is a cache-access failure, not evidence of an incompatible package API;
+  macOS 14.0 here is the manifest compiler target, not the product minimum.
+- The approved resolve retry exited 0 and fetched version 0.7.2 and its released
+  binary artifact. Build and test then ran with approved cache/checkout access.
+- Build exited 0: `Build complete! (7.77 secs)`, compiling AutomergeUniffi,
+  Automerge, AutomergeUtilities and TodoP2PCore.
+- Test exited 0 after `Build complete! (5.53 secs)`. Bundled Testing Library 2403
+  discovered `documentSerializationRoundTrip()` and passed it after 0.002 seconds:
+  `Test run with 1 test in 0 suites passed`. The preceding XCTest output
+  `Executed 0 tests` is a separate runner, not missing Swift Testing discovery.
+  Its reported Testing target `arm64e-apple-macos14.0` does not change the manifest's
+  macOS/iOS 27.0 minimums. No compiler, API or binary-linkage failure occurred.
+- During planning, web reads of pinned Document.swift returned `Cache miss`, and
+  a sandboxed Python source read failed with `<urlopen error [Errno 8] nodename nor servname provided, or not known>`.
+  Approved pinned-source reads succeeded, then the resolved checkout confirmed
+  the same APIs. These were source-access restrictions, not dependency failures.
+
+This proves macOS host compilation, binary linkage and an in-memory serialization/
+reload round trip only. iOS compatibility, app linkage with this dependency,
+durable storage, convergence, synchronization, provider behavior and security
+remain unverified. No automerge-repo-swift, app/project edits, product features,
+persistence, networking, commits or publishing were added. Step 07 was not started.
+Only step 06 is newly complete; step 05 remains the earliest unfinished action.
+
+Review: inspected tracked diffs, the new test and Package.resolved, and confirmed
+`git diff --check` passes. All 3,268 generated package files are ignored; the
+lockfile and test remain trackable. New-file and changed vault-section whitespace
+checks pass. No repository roadmap copy exists. Concurrent iOS source, scheme
+and project changes appeared during final review and were left untouched; this
+task neither verifies them nor changes step 05 completion. The next action stays
+at the earliest unfinished step, 05, until its owner records successful checks.
