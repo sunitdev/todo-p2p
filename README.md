@@ -21,7 +21,3 @@ xcodebuild -project TodoP2P.xcodeproj -scheme TodoP2PiOS -configuration Debug \
   -destination 'generic/platform=iOS Simulator' -derivedDataPath DerivedData \
   CODE_SIGNING_ALLOWED=NO build
 ```
-
-Detailed documentation lives in the **Todo P2P Obsidian vault**, starting at `Todo P2P.md`:
-
-`/Users/sunit/Library/Mobile Documents/iCloud~md~obsidian/Documents/Personal/Freelance/Personal/Projects/Todo P2P`
