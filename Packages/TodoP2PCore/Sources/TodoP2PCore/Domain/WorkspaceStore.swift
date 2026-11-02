@@ -120,28 +120,43 @@ public actor WorkspaceStore {
         try editText(id: id, field: "notes", value: notes)
     }
 
+    public func setCompleted(id: String, completed: Bool) throws -> TodoProjection {
+        let record = try editableRecord(id: id)
+        // always assign, an equal selected value can still hide a competing one
+        try document.put(obj: record, key: "completed", value: .Boolean(completed))
+        return try projection(id: id, record: record)
+    }
+
     private func editText(id: String, field: String, value: String) throws -> TodoProjection {
-        guard Self.isValidTodoID(id) else { throw TodoEditingError.invalidID }
-        let record: ObjId
+        let record = try editableRecord(id: id)
         let text: ObjId
         do {
-            let todos = try Self.object(document, parent: .ROOT, key: "todos", type: .Map)
-            guard !(try document.getAll(obj: todos, key: id)).isEmpty else {
-                throw TodoEditingError.missingTodo
-            }
-            record = try Self.object(document, parent: todos, key: id, type: .Map)
-            let markers = try document.getAll(obj: record, key: "deleted")
-            guard markers.allSatisfy({ $0 == .Scalar(.Boolean(true)) }) else {
-                throw TodoDiagnostic.Issue.invalidDeleted
-            }
-            guard markers.isEmpty else { throw TodoEditingError.deletedTodo }
-            _ = try projection(id: id, record: record)
             text = try Self.object(document, parent: record, key: field, type: .Text)
         } catch let issue as TodoDiagnostic.Issue {
             throw TodoEditingError.malformedRecord(issue)
         }
         try document.updateText(obj: text, value: value)
         return try projection(id: id, record: record)
+    }
+
+    private func editableRecord(id: String) throws -> ObjId {
+        guard Self.isValidTodoID(id) else { throw TodoEditingError.invalidID }
+        do {
+            let todos = try Self.object(document, parent: .ROOT, key: "todos", type: .Map)
+            guard !(try document.getAll(obj: todos, key: id)).isEmpty else {
+                throw TodoEditingError.missingTodo
+            }
+            let record = try Self.object(document, parent: todos, key: id, type: .Map)
+            let markers = try document.getAll(obj: record, key: "deleted")
+            guard markers.allSatisfy({ $0 == .Scalar(.Boolean(true)) }) else {
+                throw TodoDiagnostic.Issue.invalidDeleted
+            }
+            guard markers.isEmpty else { throw TodoEditingError.deletedTodo }
+            _ = try projection(id: id, record: record)
+            return record
+        } catch let issue as TodoDiagnostic.Issue {
+            throw TodoEditingError.malformedRecord(issue)
+        }
     }
 
     private static func isValidTodoID(_ id: String) -> Bool {

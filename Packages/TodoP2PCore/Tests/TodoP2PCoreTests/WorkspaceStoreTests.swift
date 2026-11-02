@@ -663,15 +663,150 @@ func editingRejectsCompetingAndMixedValues(field: String) async throws {
 private func expectEditRejected(_ document: Document, id: String = fixtureID,
                                 error: TodoEditingError) async throws {
     let store = try WorkspaceStore.open(documentID: DocumentId().id, documentData: document.save())
-    for title in [true, false] {
+    for operation in ["title", "notes", "complete", "uncomplete"] {
         let before = await store.serialize()
         await #expect(throws: error) {
-            if title { _ = try await store.editTitle(id: id, title: "replacement") }
-            else { _ = try await store.editNotes(id: id, notes: "replacement") }
+            switch operation {
+            case "title": _ = try await store.editTitle(id: id, title: "replacement")
+            case "notes": _ = try await store.editNotes(id: id, notes: "replacement")
+            default: _ = try await store.setCompleted(id: id, completed: operation == "complete")
+            }
         }
         let after = await store.serialize()
         #expect(after.documentID == before.documentID)
         #expect(after.documentData == before.documentData)
         try expectSameState(Document(before.documentData), Document(after.documentData))
     }
+}
+
+@Test func completingUncompletingAndReopening() async throws {
+    let store = try WorkspaceStore.createNew()
+    let todo = try await store.addTodo(title: "Buy milk", createdAt: Date(timeIntervalSince1970: 1_793_534_400))
+    let other = try await store.addTodo(title: "Other")
+    for completed in [true, false, true] {
+        let changed = try await store.setCompleted(id: todo.id, completed: completed)
+        #expect(changed.completed == completed)
+        #expect(changed.id == todo.id)
+        #expect(changed.title == todo.title)
+        #expect(changed.notes == todo.notes)
+        #expect(changed.createdAt == todo.createdAt)
+        let read = try await store.readTodos()
+        #expect(read.diagnostics.isEmpty)
+        #expect(read.todos.first { $0.id == todo.id } == changed)
+        #expect(read.todos.first { $0.id == other.id } == other)
+    }
+    let expected = try await store.readTodos().todos
+    let snapshot = await store.serialize()
+    let reopened = try WorkspaceStore.open(documentID: snapshot.documentID, documentData: snapshot.documentData)
+    #expect(reopened.documentID == store.documentID)
+    let read = try await reopened.readTodos()
+    #expect(read.todos == expected)
+    #expect(read.diagnostics.isEmpty)
+    #expect(Set(read.todos.map(\.id)) == [todo.id, other.id])
+    #expect(read.todos.first { $0.id == todo.id }?.completed == true)
+    #expect(read.todos.first { $0.id == other.id }?.completed == false)
+}
+
+@Test func repeatedCompletionRequestsRecordNoChange() async throws {
+    let store = try WorkspaceStore.createNew()
+    let todo = try await store.addTodo(title: "Repeat")
+    for completed in [false, true, false] {
+        let first = try await store.setCompleted(id: todo.id, completed: completed)
+        let before = await store.serialize()
+        let repeated = try await store.setCompleted(id: todo.id, completed: completed)
+        let after = await store.serialize()
+        #expect(repeated == first)
+        #expect(repeated.completed == completed)
+        try expectSameState(Document(before.documentData), Document(after.documentData))
+    }
+}
+
+@Test func completionPreservesIdentityUnknownDataAndHistory() async throws {
+    let document = try validDocument()
+    let todos = try fixtureObject(document, parent: .ROOT, key: "todos")
+    let record = try fixtureTodo(document, todos: todos, key: fixtureID)
+    let otherID = "00000000-0000-4000-8000-000000000000"
+    let other = try fixtureTodo(document, todos: todos, key: otherID)
+    try document.put(obj: other, key: "completed", value: .Boolean(true))
+    let notes = try fixtureObject(document, parent: record, key: "notes")
+    try document.spliceText(obj: notes, start: 0, delete: 0, value: "kept notes")
+    try document.put(obj: record, key: "unknown", value: .String("retained"))
+    let unknown = try document.putObject(obj: record, key: "future", ty: .Map)
+    try document.put(obj: unknown, key: "data", value: .Bytes(Data([1, 2, 3])))
+    let branch = document.fork()
+    try document.put(obj: .ROOT, key: "unknown", value: .String("left"))
+    try branch.put(obj: .ROOT, key: "unknown", value: .String("right"))
+    try document.merge(other: branch)
+    let title = try fixtureObject(document, parent: record, key: "title")
+    let heads = document.heads()
+    let store = try WorkspaceStore.open(documentID: DocumentId().id, documentData: document.save())
+    let completed = try await store.setCompleted(id: fixtureID, completed: true)
+    #expect(completed.completed)
+    #expect(completed.title == "existing")
+    #expect(completed.notes == "kept notes")
+    #expect(completed.createdAt == Date(timeIntervalSince1970: 1))
+    let after = try await Document(store.serialize().documentData)
+    for object in [ObjId.ROOT, todos, record, other, unknown] {
+        #expect(Set(after.keys(obj: object)) == Set(document.keys(obj: object)))
+        for key in document.keys(obj: object) where object != record || key != "completed" {
+            #expect(try after.getAll(obj: object, key: key) == after.getAllAt(obj: object, key: key, heads: heads))
+        }
+    }
+    #expect(try after.getAll(obj: record, key: "completed") == [.Scalar(.Boolean(true))])
+    #expect(try after.getAllAt(obj: record, key: "completed", heads: heads) == [.Scalar(.Boolean(false))])
+    #expect(try after.text(obj: title) == "existing")
+    #expect(try after.text(obj: notes) == "kept notes")
+    #expect(after.getHistory().count == document.getHistory().count + 1)
+    for hash in document.getHistory() {
+        #expect(after.change(hash: hash) == document.change(hash: hash))
+    }
+}
+
+@Test(arguments: [true, false])
+func completionSupersedesObservedBooleanConflict(requested: Bool) async throws {
+    let document = try validDocument()
+    let todos = try fixtureObject(document, parent: .ROOT, key: "todos")
+    let record = try fixtureTodo(document, todos: todos, key: fixtureID)
+    let branch = document.fork()
+    try document.put(obj: record, key: "completed", value: .Boolean(true))
+    try branch.put(obj: record, key: "completed", value: .Boolean(true))
+    try branch.put(obj: record, key: "completed", value: .Boolean(false))
+    try document.merge(other: branch)
+    let conflict: Set<Value> = [.Scalar(.Boolean(true)), .Scalar(.Boolean(false))]
+    #expect(try document.getAll(obj: record, key: "completed") == conflict)
+    let heads = document.heads()
+    #expect(heads.count == 2)
+    let title = try fixtureObject(document, parent: record, key: "title")
+    let store = try WorkspaceStore.open(documentID: DocumentId().id, documentData: document.save())
+    let selected = try #require(await store.readTodos().todos.first)
+    #expect(try document.get(obj: record, key: "completed") == .Scalar(.Boolean(selected.completed)))
+    let changed = try await store.setCompleted(id: fixtureID, completed: requested)
+    #expect(changed.completed == requested)
+    #expect(changed.title == "existing")
+    let snapshot = await store.serialize()
+    let after = try Document(snapshot.documentData)
+    #expect(try after.getAll(obj: record, key: "completed") == [.Scalar(.Boolean(requested))])
+    #expect(try after.getAllAt(obj: record, key: "completed", heads: heads) == conflict)
+    #expect(after.heads().count == 1)
+    #expect(try after.getAt(obj: record, key: "title", heads: heads) == after.get(obj: record, key: "title"))
+    #expect(try after.text(obj: title) == "existing")
+    for hash in document.getHistory() {
+        #expect(after.change(hash: hash) == document.change(hash: hash))
+    }
+    let reopened = try WorkspaceStore.open(documentID: snapshot.documentID, documentData: snapshot.documentData)
+    #expect(reopened.documentID == store.documentID)
+    #expect(try await reopened.readTodos().todos == [changed])
+}
+
+@Test(arguments: [ScalarValue.Int(0), .String("true"), .Null])
+func completionRejectsMixedTypeConflicts(value: ScalarValue) async throws {
+    let document = try validDocument()
+    let todos = try fixtureObject(document, parent: .ROOT, key: "todos")
+    let record = try fixtureTodo(document, todos: todos, key: fixtureID)
+    let branch = document.fork()
+    try document.put(obj: record, key: "completed", value: .Boolean(true))
+    try branch.put(obj: record, key: "completed", value: value)
+    try document.merge(other: branch)
+    #expect(try document.getAll(obj: record, key: "completed") == [.Scalar(.Boolean(true)), .Scalar(value)])
+    try await expectEditRejected(document, error: .malformedRecord(.invalidType("completed")))
 }
