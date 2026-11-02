@@ -337,6 +337,7 @@ func invalidCreationDatesDoNotMutate(seconds: Double) async throws {
     let future = try document.putObject(obj: .ROOT, key: "future", ty: .Map)
     try document.put(obj: future, key: "flag", value: .Boolean(true))
     let history = document.getHistory()
+    let heads = document.heads()
     let store = try WorkspaceStore.open(documentID: DocumentId().id, documentData: document.save())
     let added = try await store.addTodo(title: "new")
     #expect(added.id != fixtureID)
@@ -345,13 +346,13 @@ func invalidCreationDatesDoNotMutate(seconds: Double) async throws {
     let afterTodos = try fixtureObject(after, parent: .ROOT, key: "todos")
     let afterRecord = try fixtureObject(after, parent: afterTodos, key: fixtureID)
     let afterText = try fixtureObject(after, parent: afterRecord, key: "title")
-    #expect(afterTodos == todos)
-    #expect(afterRecord == record)
-    #expect(afterText == text)
+    #expect(try after.getAt(obj: .ROOT, key: "todos", heads: heads) == .Object(afterTodos, .Map))
+    #expect(try after.getAt(obj: afterTodos, key: fixtureID, heads: heads) == .Object(afterRecord, .Map))
+    #expect(try after.getAt(obj: afterRecord, key: "title", heads: heads) == .Object(afterText, .Text))
     #expect(try after.text(obj: text) == "existing")
     #expect(try after.get(obj: record, key: "unknown") == .Scalar(.String("retained")))
     let afterFuture = try fixtureObject(after, parent: .ROOT, key: "future")
-    #expect(afterFuture == future)
+    #expect(try after.getAt(obj: .ROOT, key: "future", heads: heads) == .Object(afterFuture, .Map))
     #expect(try after.get(obj: future, key: "flag") == .Scalar(.Boolean(true)))
     for hash in history { #expect(after.change(hash: hash) == document.change(hash: hash)) }
     #expect(try await store.readTodos().todos.count == 2)
@@ -496,4 +497,181 @@ func creationAcceptsPastAndFutureDates(seconds: Double) async throws {
     let expected = Date(timeIntervalSince1970: Double(Int64(date.timeIntervalSince1970 * 1000)) / 1000)
     #expect(todo.createdAt == expected)
     #expect(try await store.readTodos().todos == [todo])
+}
+
+@Test func editingTextIndependentlyAndReopening() async throws {
+    let store = try WorkspaceStore.createNew()
+    let original = try await store.addTodo(title: "Original")
+    let values = ["", " \t\n", "first\nsecond 📝👩🏽‍💻🇮🇪", "e\u{301}", "é", "e\u{301}", ""]
+    var title = original.title
+    var notes = original.notes
+    for value in values {
+        let titled = try await store.editTitle(id: original.id, title: value)
+        title = value
+        #expect(Array(titled.title.unicodeScalars) == Array(value.unicodeScalars))
+        #expect(Array(titled.notes.unicodeScalars) == Array(notes.unicodeScalars))
+        let noted = try await store.editNotes(id: original.id, notes: value)
+        notes = value
+        #expect(Array(noted.notes.unicodeScalars) == Array(value.unicodeScalars))
+        #expect(Array(noted.title.unicodeScalars) == Array(title.unicodeScalars))
+        #expect(noted.id == original.id)
+        #expect(noted.createdAt == original.createdAt)
+        #expect(noted.completed == original.completed)
+        let read = try #require(await store.readTodos().todos.first)
+        #expect(Array(read.title.unicodeScalars) == Array(title.unicodeScalars))
+        #expect(Array(read.notes.unicodeScalars) == Array(notes.unicodeScalars))
+    }
+    _ = try await store.editTitle(id: original.id, title: "Final 📝")
+    let edited = try await store.editNotes(id: original.id, notes: "e\u{301}\nfinal")
+    let snapshot = await store.serialize()
+    let reopened = try WorkspaceStore.open(documentID: snapshot.documentID, documentData: snapshot.documentData)
+    #expect(reopened.documentID == store.documentID)
+    #expect(try await reopened.readTodos().todos == [edited])
+}
+
+@Test func editingPreservesIdentityUnknownDataAndHistory() async throws {
+    let document = try validDocument()
+    let todos = try fixtureObject(document, parent: .ROOT, key: "todos")
+    let record = try fixtureTodo(document, todos: todos, key: fixtureID)
+    let otherID = "00000000-0000-4000-8000-000000000000"
+    let other = try fixtureTodo(document, todos: todos, key: otherID)
+    try document.put(obj: record, key: "completed", value: .Boolean(true))
+    let unknown = try document.putObject(obj: record, key: "future", ty: .Map)
+    try document.put(obj: unknown, key: "data", value: .Bytes(Data([1, 2, 3])))
+    let branch = document.fork()
+    try document.put(obj: .ROOT, key: "unknown", value: .String("left"))
+    try branch.put(obj: .ROOT, key: "unknown", value: .String("right"))
+    try document.merge(other: branch)
+    let title = try fixtureObject(document, parent: record, key: "title")
+    let notes = try fixtureObject(document, parent: record, key: "notes")
+    let heads = document.heads()
+    let store = try WorkspaceStore.open(documentID: DocumentId().id, documentData: document.save())
+    _ = try await store.editTitle(id: fixtureID, title: "changed")
+    _ = try await store.editNotes(id: fixtureID, notes: "new notes")
+    let snapshot = await store.serialize()
+    let after = try Document(snapshot.documentData)
+    for object in [ObjId.ROOT, todos, record, other, unknown] {
+        #expect(Set(after.keys(obj: object)) == Set(document.keys(obj: object)))
+        for key in document.keys(obj: object) {
+            #expect(try after.getAll(obj: object, key: key) == after.getAllAt(obj: object, key: key, heads: heads))
+        }
+    }
+    #expect(try after.text(obj: title) == "changed")
+    #expect(try after.text(obj: notes) == "new notes")
+    for field in ["title", "notes"] {
+        let text = try fixtureObject(document, parent: other, key: field)
+        #expect(try after.text(obj: text) == document.text(obj: text))
+    }
+    #expect(try after.textAt(obj: title, heads: heads) == "existing")
+    #expect(try after.textAt(obj: notes, heads: heads) == "")
+    for hash in document.getHistory() {
+        #expect(after.getHistory().contains(hash))
+        #expect(after.change(hash: hash) == document.change(hash: hash))
+    }
+}
+
+@Test func invalidAndMissingEditIDsDoNotMutate() async throws {
+    let document = try validDocument()
+    for id in ["", "invalid", fixtureID.uppercased(), "550e8400-e29b-11d4-a716-446655440000",
+               "550e8400-e29b-41d4-7716-446655440000", fixtureID] {
+        try await expectEditRejected(document, id: id, error: id == fixtureID ? .missingTodo : .invalidID)
+    }
+}
+
+@Test(arguments: ["title", "notes", "completed", "createdAt"])
+func editingRejectsMissingAndMalformedFields(field: String) async throws {
+    for missing in [true, false] {
+        let document = try validDocument()
+        let todos = try fixtureObject(document, parent: .ROOT, key: "todos")
+        let record = try fixtureTodo(document, todos: todos, key: fixtureID)
+        if missing { try document.delete(obj: record, key: field) }
+        else { try document.put(obj: record, key: field, value: .String("invalid")) }
+        try await expectEditRejected(document, error: .malformedRecord(
+            missing ? .missingField(field) : .invalidType(field)))
+    }
+}
+
+@Test(arguments: ["record", "title", "notes", "createdAt", "completed", "deleted"])
+func editingRejectsCompetingAndMixedValues(field: String) async throws {
+    for mixed in [false, true] {
+        let document = try validDocument()
+        let todos = try fixtureObject(document, parent: .ROOT, key: "todos")
+        let record = try fixtureTodo(document, todos: todos, key: fixtureID)
+        let branch = document.fork()
+        let parent = field == "record" ? todos : record
+        let key = field == "record" ? fixtureID : field
+        let issue: TodoDiagnostic.Issue
+        switch field {
+        case "record", "title", "notes":
+            let type: ObjType = field == "record" ? .Map : .Text
+            _ = try document.putObject(obj: parent, key: key, ty: type)
+            if mixed { try branch.put(obj: parent, key: key, value: .Null) }
+            else { _ = try branch.putObject(obj: parent, key: key, ty: type) }
+            issue = mixed ? .invalidType(key) : .competingObjects(key)
+        case "createdAt":
+            try document.put(obj: record, key: key, value: .Timestamp(Date(timeIntervalSince1970: 2)))
+            try branch.put(obj: record, key: key, value: mixed ? .Null : .Timestamp(Date(timeIntervalSince1970: 3)))
+            issue = mixed ? .invalidType(key) : .conflictingCreatedAt
+        case "completed":
+            try document.put(obj: record, key: key, value: .Boolean(true))
+            try branch.put(obj: record, key: key, value: .Null)
+            issue = .invalidType(key)
+        default:
+            try document.put(obj: record, key: key, value: .Boolean(true))
+            try branch.put(obj: record, key: key, value: mixed ? .Null : .Boolean(false))
+            issue = .invalidDeleted
+        }
+        try document.merge(other: branch)
+        try await expectEditRejected(document, error: .malformedRecord(issue))
+    }
+}
+
+@Test func editingRejectsDeletedAndMalformedRecords() async throws {
+    for marker in [ScalarValue.Boolean(true), .Boolean(false), .Null] {
+        let document = try validDocument()
+        let todos = try fixtureObject(document, parent: .ROOT, key: "todos")
+        let record = try fixtureTodo(document, todos: todos, key: fixtureID)
+        try document.put(obj: record, key: "deleted", value: marker)
+        try document.delete(obj: record, key: "title")
+        try await expectEditRejected(document, error: marker == .Boolean(true)
+            ? .deletedTodo : .malformedRecord(.invalidDeleted))
+    }
+    let document = try validDocument()
+    let todos = try fixtureObject(document, parent: .ROOT, key: "todos")
+    try document.put(obj: todos, key: fixtureID, value: .Null)
+    try await expectEditRejected(document, error: .malformedRecord(.invalidType(fixtureID)))
+}
+
+@Test func editingAllowsBooleanCompletionConflicts() async throws {
+    let document = try validDocument()
+    let todos = try fixtureObject(document, parent: .ROOT, key: "todos")
+    let record = try fixtureTodo(document, todos: todos, key: fixtureID)
+    let branch = document.fork()
+    try document.put(obj: record, key: "completed", value: .Boolean(true))
+    try branch.put(obj: record, key: "completed", value: .Boolean(true))
+    try branch.put(obj: record, key: "completed", value: .Boolean(false))
+    try document.merge(other: branch)
+    let store = try WorkspaceStore.open(documentID: DocumentId().id, documentData: document.save())
+    let original = try #require(await store.readTodos().todos.first)
+    let edited = try await store.editTitle(id: fixtureID, title: "new")
+    #expect(edited.completed == original.completed)
+    let snapshot = await store.serialize()
+    let after = try Document(snapshot.documentData)
+    #expect(try after.getAll(obj: record, key: "completed") == document.getAll(obj: record, key: "completed"))
+}
+
+private func expectEditRejected(_ document: Document, id: String = fixtureID,
+                                error: TodoEditingError) async throws {
+    let store = try WorkspaceStore.open(documentID: DocumentId().id, documentData: document.save())
+    for title in [true, false] {
+        let before = await store.serialize()
+        await #expect(throws: error) {
+            if title { _ = try await store.editTitle(id: id, title: "replacement") }
+            else { _ = try await store.editNotes(id: id, notes: "replacement") }
+        }
+        let after = await store.serialize()
+        #expect(after.documentID == before.documentID)
+        #expect(after.documentData == before.documentData)
+        try expectSameState(Document(before.documentData), Document(after.documentData))
+    }
 }

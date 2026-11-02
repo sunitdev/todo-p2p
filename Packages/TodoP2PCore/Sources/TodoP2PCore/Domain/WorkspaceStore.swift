@@ -39,6 +39,13 @@ public enum TodoCreationError: Error, Sendable, Equatable {
     case invalidTimestamp
 }
 
+public enum TodoEditingError: Error, Sendable, Equatable {
+    case invalidID
+    case missingTodo
+    case deletedTodo
+    case malformedRecord(TodoDiagnostic.Issue)
+}
+
 public enum WorkspaceOpeningError: Error, Equatable {
     case invalidDocumentID
     case missingSchemaVersion
@@ -105,15 +112,51 @@ public actor WorkspaceStore {
         return try projection(id: id, record: record)
     }
 
+    public func editTitle(id: String, title: String) throws -> TodoProjection {
+        try editText(id: id, field: "title", value: title)
+    }
+
+    public func editNotes(id: String, notes: String) throws -> TodoProjection {
+        try editText(id: id, field: "notes", value: notes)
+    }
+
+    private func editText(id: String, field: String, value: String) throws -> TodoProjection {
+        guard Self.isValidTodoID(id) else { throw TodoEditingError.invalidID }
+        let record: ObjId
+        let text: ObjId
+        do {
+            let todos = try Self.object(document, parent: .ROOT, key: "todos", type: .Map)
+            guard !(try document.getAll(obj: todos, key: id)).isEmpty else {
+                throw TodoEditingError.missingTodo
+            }
+            record = try Self.object(document, parent: todos, key: id, type: .Map)
+            let markers = try document.getAll(obj: record, key: "deleted")
+            guard markers.allSatisfy({ $0 == .Scalar(.Boolean(true)) }) else {
+                throw TodoDiagnostic.Issue.invalidDeleted
+            }
+            guard markers.isEmpty else { throw TodoEditingError.deletedTodo }
+            _ = try projection(id: id, record: record)
+            text = try Self.object(document, parent: record, key: field, type: .Text)
+        } catch let issue as TodoDiagnostic.Issue {
+            throw TodoEditingError.malformedRecord(issue)
+        }
+        try document.updateText(obj: text, value: value)
+        return try projection(id: id, record: record)
+    }
+
+    private static func isValidTodoID(_ id: String) -> Bool {
+        guard let uuid = UUID(uuidString: id), uuid.uuidString.lowercased() == id else { return false }
+        return id[id.index(id.startIndex, offsetBy: 14)] == "4"
+            && "89ab".contains(id[id.index(id.startIndex, offsetBy: 19)])
+    }
+
     public func readTodos() throws -> TodoReadResult {
         let todos = try Self.object(document, parent: .ROOT, key: "todos", type: .Map)
         var projections: [TodoProjection] = []
         var diagnostics: [TodoDiagnostic] = []
         for key in document.keys(obj: todos).sorted(by: { $0.utf8.lexicographicallyPrecedes($1.utf8) }) {
             do {
-                guard let uuid = UUID(uuidString: key), uuid.uuidString.lowercased() == key,
-                      key[key.index(key.startIndex, offsetBy: 14)] == "4",
-                      "89ab".contains(key[key.index(key.startIndex, offsetBy: 19)]) else {
+                guard Self.isValidTodoID(key) else {
                     throw TodoDiagnostic.Issue.invalidID
                 }
                 let record = try Self.object(document, parent: todos, key: key, type: .Map)
