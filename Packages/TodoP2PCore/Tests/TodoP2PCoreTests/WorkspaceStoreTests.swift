@@ -663,13 +663,18 @@ func editingRejectsCompetingAndMixedValues(field: String) async throws {
 private func expectEditRejected(_ document: Document, id: String = fixtureID,
                                 error: TodoEditingError) async throws {
     let store = try WorkspaceStore.open(documentID: DocumentId().id, documentData: document.save())
-    for operation in ["title", "notes", "complete", "uncomplete"] {
+    for operation in ["title", "notes", "complete", "uncomplete", "delete"] {
         let before = await store.serialize()
-        await #expect(throws: error) {
-            switch operation {
-            case "title": _ = try await store.editTitle(id: id, title: "replacement")
-            case "notes": _ = try await store.editNotes(id: id, notes: "replacement")
-            default: _ = try await store.setCompleted(id: id, completed: operation == "complete")
+        if operation == "delete" && error == .deletedTodo {
+            try await store.deleteTodo(id: id)
+        } else {
+            await #expect(throws: error) {
+                switch operation {
+                case "title": _ = try await store.editTitle(id: id, title: "replacement")
+                case "notes": _ = try await store.editNotes(id: id, notes: "replacement")
+                case "delete": try await store.deleteTodo(id: id)
+                default: _ = try await store.setCompleted(id: id, completed: operation == "complete")
+                }
             }
         }
         let after = await store.serialize()
@@ -809,4 +814,176 @@ func completionRejectsMixedTypeConflicts(value: ScalarValue) async throws {
     try document.merge(other: branch)
     #expect(try document.getAll(obj: record, key: "completed") == [.Scalar(.Boolean(true)), .Scalar(value)])
     try await expectEditRejected(document, error: .malformedRecord(.invalidType("completed")))
+}
+
+@Test func deletingHidesOnlyTargetAndReopening() async throws {
+    let store = try WorkspaceStore.createNew()
+    let deleted = try await store.addTodo(title: "Delete me")
+    let kept = try await store.addTodo(title: "Keep me")
+    try await store.deleteTodo(id: deleted.id)
+    let read = try await store.readTodos()
+    #expect(read.todos == [kept])
+    #expect(read.diagnostics.isEmpty)
+    let before = await store.serialize()
+    try await store.deleteTodo(id: deleted.id)
+    let after = await store.serialize()
+    #expect(after.documentData == before.documentData)
+    try expectSameState(Document(before.documentData), Document(after.documentData))
+    let reopened = try WorkspaceStore.open(documentID: after.documentID, documentData: after.documentData)
+    #expect(reopened.documentID == store.documentID)
+    let reread = try await reopened.readTodos()
+    #expect(reread.todos == [kept])
+    #expect(reread.diagnostics.isEmpty)
+    let document = try await Document(reopened.serialize().documentData)
+    let todos = try fixtureObject(document, parent: .ROOT, key: "todos")
+    let record = try fixtureObject(document, parent: todos, key: deleted.id)
+    #expect(try document.getAll(obj: record, key: "deleted") == [.Scalar(.Boolean(true))])
+    #expect(try document.text(obj: fixtureObject(document, parent: record, key: "title")) == "Delete me")
+    #expect(try document.get(obj: record, key: "completed") == .Scalar(.Boolean(false)))
+    #expect(try document.get(obj: record, key: "createdAt") == .Scalar(.Timestamp(deleted.createdAt)))
+    try await expectEditRejected(document, id: deleted.id, error: .deletedTodo)
+}
+
+@Test func deletionPreservesRecordUnknownDataAndHistory() async throws {
+    let document = try validDocument()
+    let todos = try fixtureObject(document, parent: .ROOT, key: "todos")
+    let record = try fixtureTodo(document, todos: todos, key: fixtureID)
+    let otherID = "00000000-0000-4000-8000-000000000000"
+    let other = try fixtureTodo(document, todos: todos, key: otherID)
+    try document.put(obj: record, key: "completed", value: .Boolean(true))
+    let notes = try fixtureObject(document, parent: record, key: "notes")
+    try document.spliceText(obj: notes, start: 0, delete: 0, value: "kept notes")
+    try document.put(obj: record, key: "unknown", value: .String("retained"))
+    let unknown = try document.putObject(obj: record, key: "future", ty: .Map)
+    try document.put(obj: unknown, key: "data", value: .Bytes(Data([1, 2, 3])))
+    let branch = document.fork()
+    try document.put(obj: .ROOT, key: "unknown", value: .String("left"))
+    try branch.put(obj: .ROOT, key: "unknown", value: .String("right"))
+    try document.merge(other: branch)
+    let title = try fixtureObject(document, parent: record, key: "title")
+    let heads = document.heads()
+    let store = try WorkspaceStore.open(documentID: DocumentId().id, documentData: document.save())
+    try await store.deleteTodo(id: fixtureID)
+    let read = try await store.readTodos()
+    #expect(read.todos.map(\.id) == [otherID])
+    #expect(read.diagnostics.isEmpty)
+    let after = try await Document(store.serialize().documentData)
+    for object in [ObjId.ROOT, todos, record, other, unknown] {
+        let added: Set<String> = object == record ? ["deleted"] : []
+        #expect(Set(after.keys(obj: object)) == Set(document.keys(obj: object)).union(added))
+        for key in document.keys(obj: object) {
+            #expect(try after.getAll(obj: object, key: key) == after.getAllAt(obj: object, key: key, heads: heads))
+        }
+    }
+    #expect(try after.get(obj: record, key: "deleted") == .Scalar(.Boolean(true)))
+    #expect(try after.getAll(obj: record, key: "deleted") == [.Scalar(.Boolean(true))])
+    #expect(try after.getAllAt(obj: record, key: "deleted", heads: heads).isEmpty)
+    #expect(try after.text(obj: title) == "existing")
+    #expect(try after.text(obj: notes) == "kept notes")
+    #expect(try after.get(obj: record, key: "completed") == .Scalar(.Boolean(true)))
+    #expect(try after.get(obj: record, key: "createdAt") == .Scalar(.Timestamp(Date(timeIntervalSince1970: 1))))
+    #expect(try after.get(obj: record, key: "unknown") == .Scalar(.String("retained")))
+    #expect(try after.get(obj: unknown, key: "data") == .Scalar(.Bytes(Data([1, 2, 3]))))
+    for field in ["title", "notes"] {
+        let text = try fixtureObject(document, parent: other, key: field)
+        #expect(try after.text(obj: text) == document.text(obj: text))
+    }
+    #expect(after.getHistory().count == document.getHistory().count + 1)
+    for hash in document.getHistory() {
+        #expect(after.change(hash: hash) == document.change(hash: hash))
+    }
+}
+
+@Test func concurrentDeletionsCollapseAndRepeatWithoutChange() async throws {
+    let document = try validDocument()
+    let todos = try fixtureObject(document, parent: .ROOT, key: "todos")
+    let record = try fixtureTodo(document, todos: todos, key: fixtureID)
+    let branch = document.fork()
+    try document.put(obj: record, key: "deleted", value: .Boolean(true))
+    try branch.put(obj: record, key: "deleted", value: .Boolean(true))
+    try document.merge(other: branch)
+    #expect(document.heads().count == 2)
+    #expect(try document.getAll(obj: record, key: "deleted") == [.Scalar(.Boolean(true))])
+    try await expectRead(document, ids: [], issue: nil)
+    try await expectEditRejected(document, error: .deletedTodo)
+}
+
+@Test(arguments: [
+    ScalarValue.Boolean(false), .Null, .Int(1), .String("true"), .Timestamp(Date(timeIntervalSince1970: 1))
+])
+func invalidDeletionMarkersStayMalformed(marker: ScalarValue) async throws {
+    let otherID = "00000000-0000-4000-8000-000000000000"
+    var selected: Set<Value> = []
+    for trueWriter in ["none", "original", "branch"] {
+        let document = try validDocument()
+        let todos = try fixtureObject(document, parent: .ROOT, key: "todos")
+        let record = try fixtureTodo(document, todos: todos, key: fixtureID)
+        try fixtureTodo(document, todos: todos, key: otherID)
+        try document.delete(obj: record, key: "title")
+        let branch = document.fork()
+        // fixed actors so swapping the writers really swaps which value get selects
+        document.actor = ActorId(uuid: try #require(UUID(uuidString: "00000000-0000-4000-8000-000000000001")))
+        branch.actor = ActorId(uuid: try #require(UUID(uuidString: "00000000-0000-4000-8000-000000000002")))
+        switch trueWriter {
+        case "none":
+            try document.put(obj: record, key: "deleted", value: marker)
+        case "original":
+            try document.put(obj: record, key: "deleted", value: .Boolean(true))
+            try branch.put(obj: record, key: "deleted", value: marker)
+        default:
+            try document.put(obj: record, key: "deleted", value: marker)
+            try branch.put(obj: record, key: "deleted", value: .Boolean(true))
+        }
+        try document.merge(other: branch)
+        if trueWriter != "none" {
+            #expect(try document.getAll(obj: record, key: "deleted") == [.Scalar(.Boolean(true)), .Scalar(marker)])
+            selected.insert(try #require(try document.get(obj: record, key: "deleted")))
+        }
+        try await expectRead(document, ids: [otherID], issue: .invalidDeleted)
+        try await expectEditRejected(document, error: .malformedRecord(.invalidDeleted))
+    }
+    #expect(selected == [.Scalar(.Boolean(true)), .Scalar(marker)])
+}
+
+@Test func objectDeletionMarkersStayMalformed() async throws {
+    for concurrentTrue in [false, true] {
+        let document = try validDocument()
+        let todos = try fixtureObject(document, parent: .ROOT, key: "todos")
+        let record = try fixtureTodo(document, todos: todos, key: fixtureID)
+        let branch = document.fork()
+        _ = try document.putObject(obj: record, key: "deleted", ty: .Map)
+        if concurrentTrue { try branch.put(obj: record, key: "deleted", value: .Boolean(true)) }
+        try document.merge(other: branch)
+        #expect(try document.getAll(obj: record, key: "deleted").count == (concurrentTrue ? 2 : 1))
+        try await expectRead(document, ids: [], issue: .invalidDeleted)
+        try await expectEditRejected(document, error: .malformedRecord(.invalidDeleted))
+    }
+}
+
+@Test func deletionPreservesBooleanCompletionConflict() async throws {
+    let document = try validDocument()
+    let todos = try fixtureObject(document, parent: .ROOT, key: "todos")
+    let record = try fixtureTodo(document, todos: todos, key: fixtureID)
+    let branch = document.fork()
+    try document.put(obj: record, key: "completed", value: .Boolean(true))
+    try branch.put(obj: record, key: "completed", value: .Boolean(true))
+    try branch.put(obj: record, key: "completed", value: .Boolean(false))
+    try document.merge(other: branch)
+    let conflict: Set<Value> = [.Scalar(.Boolean(true)), .Scalar(.Boolean(false))]
+    #expect(try document.getAll(obj: record, key: "completed") == conflict)
+    let heads = document.heads()
+    let store = try WorkspaceStore.open(documentID: DocumentId().id, documentData: document.save())
+    #expect(try await store.readTodos().todos.map(\.id) == [fixtureID])
+    try await store.deleteTodo(id: fixtureID)
+    let snapshot = await store.serialize()
+    let after = try Document(snapshot.documentData)
+    #expect(try after.getAll(obj: record, key: "completed") == conflict)
+    #expect(try after.getAllAt(obj: record, key: "completed", heads: heads) == conflict)
+    #expect(try after.getAll(obj: record, key: "deleted") == [.Scalar(.Boolean(true))])
+    #expect(after.getHistory().count == document.getHistory().count + 1)
+    let reopened = try WorkspaceStore.open(documentID: snapshot.documentID, documentData: snapshot.documentData)
+    #expect(reopened.documentID == store.documentID)
+    let read = try await reopened.readTodos()
+    #expect(read.todos.isEmpty)
+    #expect(read.diagnostics.isEmpty)
 }

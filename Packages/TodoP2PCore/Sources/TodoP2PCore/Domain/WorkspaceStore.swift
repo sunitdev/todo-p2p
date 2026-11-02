@@ -139,7 +139,19 @@ public actor WorkspaceStore {
         return try projection(id: id, record: record)
     }
 
+    public func deleteTodo(id: String) throws {
+        let target = try targetRecord(id: id)
+        guard !target.deleted else { return }
+        try document.put(obj: target.record, key: "deleted", value: .Boolean(true))
+    }
+
     private func editableRecord(id: String) throws -> ObjId {
+        let target = try targetRecord(id: id)
+        guard !target.deleted else { throw TodoEditingError.deletedTodo }
+        return target.record
+    }
+
+    private func targetRecord(id: String) throws -> (record: ObjId, deleted: Bool) {
         guard Self.isValidTodoID(id) else { throw TodoEditingError.invalidID }
         do {
             let todos = try Self.object(document, parent: .ROOT, key: "todos", type: .Map)
@@ -147,16 +159,20 @@ public actor WorkspaceStore {
                 throw TodoEditingError.missingTodo
             }
             let record = try Self.object(document, parent: todos, key: id, type: .Map)
-            let markers = try document.getAll(obj: record, key: "deleted")
-            guard markers.allSatisfy({ $0 == .Scalar(.Boolean(true)) }) else {
-                throw TodoDiagnostic.Issue.invalidDeleted
-            }
-            guard markers.isEmpty else { throw TodoEditingError.deletedTodo }
+            if try Self.isDeleted(document, record: record) { return (record, true) }
             _ = try projection(id: id, record: record)
-            return record
+            return (record, false)
         } catch let issue as TodoDiagnostic.Issue {
             throw TodoEditingError.malformedRecord(issue)
         }
+    }
+
+    private static func isDeleted(_ document: Document, record: ObjId) throws -> Bool {
+        let markers = try document.getAll(obj: record, key: "deleted")
+        guard markers.allSatisfy({ $0 == .Scalar(.Boolean(true)) }) else {
+            throw TodoDiagnostic.Issue.invalidDeleted
+        }
+        return !markers.isEmpty
     }
 
     private static func isValidTodoID(_ id: String) -> Bool {
@@ -175,11 +191,7 @@ public actor WorkspaceStore {
                     throw TodoDiagnostic.Issue.invalidID
                 }
                 let record = try Self.object(document, parent: todos, key: key, type: .Map)
-                let markers = try document.getAll(obj: record, key: "deleted")
-                guard markers.allSatisfy({ $0 == .Scalar(.Boolean(true)) }) else {
-                    throw TodoDiagnostic.Issue.invalidDeleted
-                }
-                if !markers.isEmpty { continue }
+                if try Self.isDeleted(document, record: record) { continue }
                 projections.append(try projection(id: key, record: record))
             } catch let issue as TodoDiagnostic.Issue {
                 diagnostics.append(TodoDiagnostic(key: key, issue: issue))
