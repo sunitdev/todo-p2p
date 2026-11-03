@@ -410,3 +410,51 @@ private func pumpAll(_ pairs: [WorkspaceSyncHarness], starting: Replica, limit: 
         #expect(try await pumpAll(pairs, starting: starting) == 0)
     }
 }
+
+@Test(arguments: [false, true])
+private func incomingChangesSurviveDiskReopen(failSave: Bool) async throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent("todo-incoming-\(UUID())")
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let io = FaultIO()
+    let baseline = try syncFixture()
+    try WorkspacePersistence(directory: directory, io: io).save(baseline, exclusive: true)
+    var receiver: WorkspaceStore? = try WorkspaceStore.open(directory: directory, io: io)
+    let sender = try WorkspaceStore.open(documentID: baseline.documentID, documentData: baseline.documentData)
+    _ = try await receiver!.setCompleted(id: sharedID, completed: true)
+    _ = try await sender.setCompleted(id: sharedID, completed: true)
+    _ = try await sender.setCompleted(id: sharedID, completed: false)
+    _ = try await sender.editNotes(id: sharedID, notes: "received notes")
+    let deleted = try await sender.addTodo(title: "hidden remotely", createdAt: creationTime)
+    try await sender.deleteTodo(id: deleted.id)
+    let previous = try Data(contentsOf: directory.appendingPathComponent("workspace.snapshot"))
+    var pair: WorkspaceSyncHarness? = await WorkspaceSyncHarness(first: sender, second: receiver!)
+    if failSave {
+        io.fail(.replace)
+        await #expect(throws: (any Error).self) { try await pair!.pump(starting: .first, label: "failed incoming") }
+        guard case .failed = await receiver!.saveState else { Issue.record("received failure hidden"); return }
+        #expect(try Data(contentsOf: directory.appendingPathComponent("workspace.snapshot")) == previous)
+        io.fail(.none)
+        try await receiver!.flush()
+    }
+    try await pair!.pump(starting: .first, label: "incoming durability")
+    try await receiver!.flush()
+    let snapshot = await receiver!.serialize()
+    pair = nil
+    receiver = nil
+    let reopened = try WorkspaceStore.open(directory: directory)
+    let after = await reopened.serialize()
+    #expect(after.documentID == baseline.documentID)
+    let doc = try Document(after.documentData)
+    let savedDocument = try Document(snapshot.documentData)
+    #expect(doc.heads() == savedDocument.heads())
+    for hash in savedDocument.getHistory() {
+        #expect(doc.change(hash: hash) == savedDocument.change(hash: hash))
+    }
+    #expect(try doc.getAll(obj: record(doc), key: "completed") == booleanConflict)
+    #expect(try await reopened.readTodos().todos.first?.notes == "received notes")
+    let todos = try object(doc, parent: .ROOT, key: "todos")
+    let tombstone = try object(doc, parent: todos, key: deleted.id)
+    #expect(try doc.getAll(obj: tombstone, key: "deleted") == [.Scalar(.Boolean(true))])
+    #expect(try await reopened.readTodos().todos.count == 1)
+    try await expectPreserved(baseline, on: reopened)
+}

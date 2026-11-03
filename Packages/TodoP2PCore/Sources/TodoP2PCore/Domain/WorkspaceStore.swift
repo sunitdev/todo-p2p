@@ -68,6 +68,9 @@ enum WorkspaceSyncError: Error {
 public actor WorkspaceStore {
     public nonisolated let documentID: DocumentId
     private let document: Document
+    private var persistence: WorkspacePersistence?
+    private var revision: UInt64 = 0
+    public private(set) var saveState: WorkspaceSaveState = .unsaved(revision: 0)
     private var syncStates: [UUID: SyncState] = [:]
 
     private init(documentID: DocumentId, document: Document) {
@@ -93,6 +96,83 @@ public actor WorkspaceStore {
         return WorkspaceStore(documentID: identity, document: document)
     }
 
+    public static func storageDirectory() throws -> URL {
+        try WorkspacePersistence.defaultDirectory()
+    }
+
+    public static func createNew(directory: URL) throws -> WorkspaceStore {
+        try createNew(directory: directory, io: LocalWorkspaceFileIO())
+    }
+
+    static func createNew(directory: URL, io: any WorkspaceFileIO) throws -> WorkspaceStore {
+        let documentID = DocumentId()
+        let document = Document()
+        try document.put(obj: .ROOT, key: "schemaVersion", value: .Int(1))
+        _ = try document.putObject(obj: .ROOT, key: "todos", ty: .Map)
+        let persistence = WorkspacePersistence(directory: directory, io: io)
+        try persistence.save(WorkspaceSnapshot(documentID: documentID.id,
+                                               documentData: document.save()), exclusive: true)
+        return WorkspaceStore(documentID: documentID, document: document, persistence: persistence)
+    }
+
+    public static func open(directory: URL) throws -> WorkspaceStore {
+        try open(directory: directory, io: LocalWorkspaceFileIO())
+    }
+
+    static func open(directory: URL, io: any WorkspaceFileIO) throws -> WorkspaceStore {
+        let persistence = WorkspacePersistence(directory: directory, io: io)
+        let envelope = try persistence.load()
+        guard (20...28).contains(envelope.documentID.utf8.count), let identity = DocumentId(envelope.documentID) else {
+            throw WorkspaceOpeningError.invalidDocumentID
+        }
+        let document = try Document(envelope.documentData)
+        try validateRoot(document)
+        try io.verifyPolicy(directory, directory: true)
+        try io.verifyPolicy(persistence.file, directory: false)
+        return WorkspaceStore(documentID: identity, document: document, persistence: persistence)
+    }
+
+    private init(documentID: DocumentId, document: Document, persistence: WorkspacePersistence) {
+        self.documentID = documentID
+        self.document = document
+        self.persistence = persistence
+        self.saveState = .saved(revision: 0)
+    }
+
+    public func flush() throws {
+        guard let persistence else { return }
+        let snapshot = serialize()
+        let savingRevision = revision
+        saveState = .saving(revision: savingRevision)
+        do {
+            try persistence.save(snapshot)
+            saveState = .saved(revision: savingRevision)
+        } catch {
+            saveState = .failed(revision: savingRevision, error: error)
+            throw error
+        }
+    }
+
+    private func changing<T>(_ operation: () throws -> T) throws -> T {
+        let before = document.heads()
+        let result: T
+        do { result = try operation() }
+        catch {
+            if document.heads() != before {
+                revision += 1
+                saveState = .unsaved(revision: revision)
+            }
+            throw error
+        }
+        if document.heads() != before {
+            revision += 1
+            saveState = .unsaved(revision: revision)
+        }
+        if case .saved = saveState { return result }
+        try flush()
+        return result
+    }
+
     public func serialize() -> WorkspaceSnapshot {
         WorkspaceSnapshot(documentID: documentID.id, documentData: document.save())
     }
@@ -111,47 +191,57 @@ public actor WorkspaceStore {
     }
 
     func receiveSyncMessage(session: WorkspaceSyncSession, message: Data) throws {
-        guard let state = syncStates[session.id] else { throw WorkspaceSyncError.unknownSession }
-        try document.receiveSyncMessage(state: state, message: message)
+        try changing {
+            guard let state = syncStates[session.id] else { throw WorkspaceSyncError.unknownSession }
+            try document.receiveSyncMessage(state: state, message: message)
+        }
     }
 
     public func addTodo(title: String, createdAt: Date = Date()) throws -> TodoProjection {
-        guard !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            throw TodoCreationError.invalidTitle
+        return try changing {
+            guard !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                throw TodoCreationError.invalidTitle
+            }
+            let milliseconds = createdAt.timeIntervalSince1970 * 1000
+            guard milliseconds.isFinite,
+                  milliseconds >= -9_223_372_036_854_775_808.0,
+                  milliseconds < 9_223_372_036_854_775_808.0 else {
+                throw TodoCreationError.invalidTimestamp
+            }
+            let todos = try Self.object(document, parent: .ROOT, key: "todos", type: .Map)
+            var id: String
+            repeat {
+                id = UUID().uuidString.lowercased()
+            } while !(try document.getAll(obj: todos, key: id)).isEmpty
+            let record = try document.putObject(obj: todos, key: id, ty: .Map)
+            let text = try document.putObject(obj: record, key: "title", ty: .Text)
+            try document.spliceText(obj: text, start: 0, delete: 0, value: title)
+            _ = try document.putObject(obj: record, key: "notes", ty: .Text)
+            try document.put(obj: record, key: "completed", value: .Boolean(false))
+            try document.put(obj: record, key: "createdAt", value: .Timestamp(createdAt))
+            return try projection(id: id, record: record)
         }
-        let milliseconds = createdAt.timeIntervalSince1970 * 1000
-        guard milliseconds.isFinite,
-              milliseconds >= -9_223_372_036_854_775_808.0,
-              milliseconds < 9_223_372_036_854_775_808.0 else {
-            throw TodoCreationError.invalidTimestamp
-        }
-        let todos = try Self.object(document, parent: .ROOT, key: "todos", type: .Map)
-        var id: String
-        repeat {
-            id = UUID().uuidString.lowercased()
-        } while !(try document.getAll(obj: todos, key: id)).isEmpty
-        let record = try document.putObject(obj: todos, key: id, ty: .Map)
-        let text = try document.putObject(obj: record, key: "title", ty: .Text)
-        try document.spliceText(obj: text, start: 0, delete: 0, value: title)
-        _ = try document.putObject(obj: record, key: "notes", ty: .Text)
-        try document.put(obj: record, key: "completed", value: .Boolean(false))
-        try document.put(obj: record, key: "createdAt", value: .Timestamp(createdAt))
-        return try projection(id: id, record: record)
     }
 
     public func editTitle(id: String, title: String) throws -> TodoProjection {
-        try editText(id: id, field: "title", value: title)
+        return try changing {
+            try editText(id: id, field: "title", value: title)
+        }
     }
 
     public func editNotes(id: String, notes: String) throws -> TodoProjection {
-        try editText(id: id, field: "notes", value: notes)
+        return try changing {
+            try editText(id: id, field: "notes", value: notes)
+        }
     }
 
     public func setCompleted(id: String, completed: Bool) throws -> TodoProjection {
-        let record = try editableRecord(id: id)
-        // always assign, an equal selected value can still hide a competing one
-        try document.put(obj: record, key: "completed", value: .Boolean(completed))
-        return try projection(id: id, record: record)
+        return try changing {
+            let record = try editableRecord(id: id)
+            // always assign, an equal selected value can still hide a competing one
+            try document.put(obj: record, key: "completed", value: .Boolean(completed))
+            return try projection(id: id, record: record)
+        }
     }
 
     private func editText(id: String, field: String, value: String) throws -> TodoProjection {
@@ -167,9 +257,11 @@ public actor WorkspaceStore {
     }
 
     public func deleteTodo(id: String) throws {
-        let target = try targetRecord(id: id)
-        guard !target.deleted else { return }
-        try document.put(obj: target.record, key: "deleted", value: .Boolean(true))
+        try changing {
+            let target = try targetRecord(id: id)
+            guard !target.deleted else { return }
+            try document.put(obj: target.record, key: "deleted", value: .Boolean(true))
+        }
     }
 
     private func editableRecord(id: String) throws -> ObjId {
