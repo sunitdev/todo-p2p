@@ -57,9 +57,18 @@ public enum WorkspaceOpeningError: Error, Equatable {
     case competingTodosMaps
 }
 
+struct WorkspaceSyncSession: Sendable {
+    fileprivate let id = UUID()
+}
+
+enum WorkspaceSyncError: Error {
+    case unknownSession
+}
+
 public actor WorkspaceStore {
     public nonisolated let documentID: DocumentId
     private let document: Document
+    private var syncStates: [UUID: SyncState] = [:]
 
     private init(documentID: DocumentId, document: Document) {
         self.documentID = documentID
@@ -86,6 +95,24 @@ public actor WorkspaceStore {
 
     public func serialize() -> WorkspaceSnapshot {
         WorkspaceSnapshot(documentID: documentID.id, documentData: document.save())
+    }
+
+    var writerActor: ActorId { document.actor }
+
+    func startSyncSession() -> WorkspaceSyncSession {
+        let session = WorkspaceSyncSession()
+        syncStates[session.id] = SyncState()
+        return session
+    }
+
+    func generateSyncMessage(session: WorkspaceSyncSession) throws -> Data? {
+        guard let state = syncStates[session.id] else { throw WorkspaceSyncError.unknownSession }
+        return document.generateSyncMessage(state: state)
+    }
+
+    func receiveSyncMessage(session: WorkspaceSyncSession, message: Data) throws {
+        guard let state = syncStates[session.id] else { throw WorkspaceSyncError.unknownSession }
+        try document.receiveSyncMessage(state: state, message: message)
     }
 
     public func addTodo(title: String, createdAt: Date = Date()) throws -> TodoProjection {
