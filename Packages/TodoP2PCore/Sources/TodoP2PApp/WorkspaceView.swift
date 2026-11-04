@@ -27,6 +27,7 @@ public struct WorkspaceView: View {
                                         .foregroundStyle(todo.completed ? .secondary : .primary)
                                 }
                             }
+                            .accessibilityIdentifier("todo-\(todo.id)")
                             .contextMenu {
                                 Button("Delete todo", role: .destructive) { Task { await model.delete(id: todo.id) } }
                             }
@@ -40,21 +41,27 @@ public struct WorkspaceView: View {
                             ContentUnavailableView("No todos", systemImage: "checklist", description: Text("Add a todo to get started."))
                         }
                     }
+                    .safeAreaInset(edge: .bottom) { compactStatus }
                     .navigationTitle("Todos")
+                    .toolbar {
+                        ToolbarItem(placement: .primaryAction) {
+                            Button("Add todo", systemImage: "plus") { adding = true }.keyboardShortcut("n")
+                        }
+                    }
                     .navigationSplitViewColumnWidth(min: 220, ideal: 260)
                 } detail: {
                     if let id = model.selection, model.todos.contains(where: { $0.id == id }) {
                         editor(id: id)
                     } else {
                         ContentUnavailableView("Select a todo", systemImage: "square.and.pencil")
+                            .safeAreaInset(edge: .bottom) { compactStatus }
                     }
                 }
-                .toolbar {
-                    ToolbarItem(placement: .primaryAction) {
-                        Button("Add todo", systemImage: "plus") { adding = true }.keyboardShortcut("n")
-                    }
+                .safeAreaInset(edge: .bottom) {
+                    #if os(macOS)
+                    status
+                    #endif
                 }
-                .safeAreaInset(edge: .bottom) { status }
                 .disabled(model.busy)
             } else if let error = model.openingError {
                 VStack(spacing: 16) {
@@ -71,6 +78,7 @@ public struct WorkspaceView: View {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Add todo").font(.headline)
                 TextField("Title", text: $model.creationTitle)
+                    .accessibilityIdentifier("creation-title")
                     .textFieldStyle(.roundedBorder)
                     .onSubmit { add() }
                 if let error = model.operationError { Text(error).foregroundStyle(.red) }
@@ -102,12 +110,12 @@ public struct WorkspaceView: View {
                 Text("Title").font(.headline)
                 TextField("Title", text: Binding(get: { model.draft(for: id).title }, set: {
                     var draft = model.draft(for: id); draft.title = $0; model.drafts[id] = draft
-                }), axis: .vertical).textFieldStyle(.roundedBorder)
+                }), axis: .vertical).textFieldStyle(.roundedBorder).accessibilityIdentifier("editor-title")
                 Text("Notes").font(.headline)
                 TextEditor(text: Binding(get: { model.draft(for: id).notes }, set: {
                     var draft = model.draft(for: id); draft.notes = $0; model.drafts[id] = draft
                 }))
-                .frame(minHeight: 220).border(.secondary.opacity(0.3)).accessibilityLabel("Notes")
+                .frame(minHeight: 220).border(.secondary.opacity(0.3)).accessibilityLabel("Notes").accessibilityIdentifier("editor-notes")
                 if model.drafts[id] != nil { Text("Editor draft — use Save to apply changes").font(.caption) }
                 HStack {
                     Button("Save") { Task { await model.save(id: id) } }.keyboardShortcut("s")
@@ -117,6 +125,7 @@ public struct WorkspaceView: View {
                 }
             }.padding()
         }
+        .safeAreaInset(edge: .bottom) { compactStatus }
         .scrollDismissesKeyboard(.interactively)
         .navigationTitle("Edit todo")
         #if os(iOS)
@@ -126,6 +135,12 @@ public struct WorkspaceView: View {
                 Button("Done") { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) }
             }
         }
+        #endif
+    }
+
+    @ViewBuilder private var compactStatus: some View {
+        #if os(iOS)
+        status
         #endif
     }
 
