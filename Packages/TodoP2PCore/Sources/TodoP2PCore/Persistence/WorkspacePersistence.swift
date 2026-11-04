@@ -21,7 +21,7 @@ struct WorkspaceEnvelope: Codable {
     let documentData: Data
 }
 
-protocol WorkspaceFileIO: Sendable {
+package protocol WorkspaceFileIO: Sendable {
     func read(_ url: URL) throws -> Data
     func prepareDirectory(_ url: URL) throws
     func writeCandidate(_ data: Data, to url: URL) throws
@@ -30,10 +30,11 @@ protocol WorkspaceFileIO: Sendable {
     func removeCandidate(_ url: URL)
 }
 
-struct LocalWorkspaceFileIO: WorkspaceFileIO {
-    func read(_ url: URL) throws -> Data { try Data(contentsOf: url) }
+package struct LocalWorkspaceFileIO: WorkspaceFileIO {
+    package init() {}
+    package func read(_ url: URL) throws -> Data { try Data(contentsOf: url) }
 
-    func prepareDirectory(_ url: URL) throws {
+    package func prepareDirectory(_ url: URL) throws {
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true,
                                                attributes: [.posixPermissions: 0o700])
         try applyPolicy(url, directory: true)
@@ -52,7 +53,7 @@ struct LocalWorkspaceFileIO: WorkspaceFileIO {
         try verifyPolicy(url, directory: directory)
     }
 
-    func verifyPolicy(_ url: URL, directory: Bool) throws {
+    package func verifyPolicy(_ url: URL, directory: Bool) throws {
         let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
         guard (attributes[.posixPermissions] as? NSNumber)?.intValue == (directory ? 0o700 : 0o600),
               try url.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup == true else {
@@ -66,7 +67,7 @@ struct LocalWorkspaceFileIO: WorkspaceFileIO {
         #endif
     }
 
-    func writeCandidate(_ data: Data, to url: URL) throws {
+    package func writeCandidate(_ data: Data, to url: URL) throws {
         #if os(iOS)
         try data.write(to: url, options: [.withoutOverwriting, .completeFileProtection])
         #else
@@ -83,7 +84,7 @@ struct LocalWorkspaceFileIO: WorkspaceFileIO {
         }
     }
 
-    func promote(_ candidate: URL, to destination: URL, exclusive: Bool) throws {
+    package func promote(_ candidate: URL, to destination: URL, exclusive: Bool) throws {
         let result = candidate.withUnsafeFileSystemRepresentation { source in
             destination.withUnsafeFileSystemRepresentation { target in
                 renamex_np(source!, target!, exclusive ? UInt32(RENAME_EXCL) : 0)
@@ -92,7 +93,7 @@ struct LocalWorkspaceFileIO: WorkspaceFileIO {
         guard result == 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
     }
 
-    func removeCandidate(_ url: URL) { try? FileManager.default.removeItem(at: url) }
+    package func removeCandidate(_ url: URL) { try? FileManager.default.removeItem(at: url) }
 }
 
 struct WorkspacePersistence: Sendable {

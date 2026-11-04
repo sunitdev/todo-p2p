@@ -9,6 +9,8 @@ xcrun swift build --package-path Packages/TodoP2PCore
 xcrun swift test --package-path Packages/TodoP2PCore
 ```
 
+Both apps share the TodoP2PApp presentation library and support local todo creation, editing, completion, deletion and save retry.
+
 Open `TodoP2P.xcodeproj` and select `TodoP2PMac` or `TodoP2PiOS` to build and run. Command-line entry points:
 
 ```sh

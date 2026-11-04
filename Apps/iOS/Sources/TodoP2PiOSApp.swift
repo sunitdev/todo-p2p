@@ -1,12 +1,13 @@
 import SwiftUI
-import TodoP2PCore
+import TodoP2PApp
 
 @main
 struct TodoP2PiOSApp: App {
+    @State private var model = WorkspaceModel()
+
     var body: some Scene {
         WindowGroup {
-            Color(uiColor: .systemBackground)
-                .ignoresSafeArea()
+            WorkspaceView(model: model)
         }
     }
 }

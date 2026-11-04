@@ -1,13 +1,14 @@
 import SwiftUI
-import TodoP2PCore
+import TodoP2PApp
 
 @main
 struct TodoP2PMacApp: App {
+    @State private var model = WorkspaceModel()
+
     var body: some Scene {
         WindowGroup {
-            Color.clear
-                .frame(minWidth: 480, minHeight: 320)
-        }
-        .defaultSize(width: 480, height: 320)
+            WorkspaceView(model: model)
+                .frame(minWidth: 680, minHeight: 440)
+        }.defaultSize(width: 900, height: 600)
     }
 }

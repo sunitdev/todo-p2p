@@ -88,7 +88,7 @@
         A00000000000000000000009 = {
             isa = XCSwiftPackageProductDependency ;
             package = A00000000000000000000008 ;
-            productName = TodoP2PCore ;
+            productName = TodoP2PApp ;
         };
         A0000000000000000000000A = {
             isa = PBXBuildFile ;
@@ -216,7 +216,7 @@
         B00000000000000000000009 = {
             isa = XCSwiftPackageProductDependency ;
             package = A00000000000000000000008 ;
-            productName = TodoP2PCore ;
+            productName = TodoP2PApp ;
         };
         B0000000000000000000000A = {
             isa = PBXBuildFile ;

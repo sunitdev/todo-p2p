@@ -104,7 +104,7 @@ public actor WorkspaceStore {
         try createNew(directory: directory, io: LocalWorkspaceFileIO())
     }
 
-    static func createNew(directory: URL, io: any WorkspaceFileIO) throws -> WorkspaceStore {
+    package static func createNew(directory: URL, io: any WorkspaceFileIO) throws -> WorkspaceStore {
         let documentID = DocumentId()
         let document = Document()
         try document.put(obj: .ROOT, key: "schemaVersion", value: .Int(1))
@@ -119,7 +119,7 @@ public actor WorkspaceStore {
         try open(directory: directory, io: LocalWorkspaceFileIO())
     }
 
-    static func open(directory: URL, io: any WorkspaceFileIO) throws -> WorkspaceStore {
+    package static func open(directory: URL, io: any WorkspaceFileIO) throws -> WorkspaceStore {
         let persistence = WorkspacePersistence(directory: directory, io: io)
         let envelope = try persistence.load()
         guard (20...28).contains(envelope.documentID.utf8.count), let identity = DocumentId(envelope.documentID) else {
