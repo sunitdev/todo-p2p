@@ -4,6 +4,7 @@ import TodoP2PCore
 public struct WorkspaceView: View {
     @Bindable var model: WorkspaceModel
     @State private var adding = false
+    @State private var pairing = false
 
     public init(model: WorkspaceModel) { self.model = model }
 
@@ -74,6 +75,11 @@ public struct WorkspaceView: View {
             }
         }
         .task { await model.start() }
+        .sheet(isPresented: $pairing) {
+            if let pairingModel = model.pairing, let id = model.documentID {
+                PairingView(model: pairingModel, documentID: id)
+            }
+        }
         .sheet(isPresented: $adding) {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Add todo").font(.headline)
@@ -146,6 +152,7 @@ public struct WorkspaceView: View {
 
     private var status: some View {
         VStack(alignment: .leading, spacing: 6) {
+            if model.pairing != nil { Button("Pair devices") { pairing = true }.accessibilityLabel("Pair devices") }
             if model.busy { ProgressView("Working…") }
             if let error = model.operationError { Text(error).foregroundStyle(.red).textSelection(.enabled) }
             switch model.saveState {

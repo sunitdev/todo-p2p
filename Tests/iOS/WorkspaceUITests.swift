@@ -12,10 +12,19 @@ final class WorkspaceUITests: XCTestCase {
         print("owned fixture: \(directory.path)")
         app = XCUIApplication()
         app.launchEnvironment["TODO_P2P_TEST_DIRECTORY"] = directory.path
+        app.launchEnvironment["TODO_P2P_TEST_KEYCHAIN"] = directory.lastPathComponent
     }
 
     override func tearDownWithError() throws {
         app.terminate()
+        if app.launchEnvironment["TODO_P2P_PAIRING_FIXTURE"] != nil {
+            app.launchEnvironment["TODO_P2P_TEST_CLEANUP"] = "1"
+            app.launch()
+            if !app.staticTexts["Saved locally"].waitForExistence(timeout: 3) {
+                XCTAssertTrue(app.staticTexts["This app’s signing configuration does not permit secure Keychain storage."].exists)
+            }
+            app.terminate()
+        }
         if FileManager.default.fileExists(atPath: directory.path) {
             try FileManager.default.removeItem(at: directory)
         }
@@ -193,6 +202,105 @@ final class WorkspaceUITests: XCTestCase {
             return XCTFail("missing retained deletion")
         }
         XCTAssertEqual(try finalDoc.get(obj: retainedRecord, key: "deleted"), .Scalar(.Boolean(true)))
+    }
+
+    func testInvalidPairingAndScannerCancellationPreserveWorkspace() throws {
+        app.launchEnvironment["TODO_P2P_PAIRING_FIXTURE"] = "1"
+        app.launch()
+        addTodo("Still offline")
+        saved()
+        app.terminate()
+        let file = directory.appendingPathComponent("workspace.snapshot")
+        let original = try Data(contentsOf: file)
+        app.launch()
+        app.buttons["Pair devices"].tap()
+        app.buttons["Import malformed test code"].tap()
+        XCTAssertTrue(app.staticTexts["This is not a supported pairing code."].exists)
+        XCTAssertFalse(app.buttons["Accept pairing"].exists)
+        app.buttons["Scan pairing code"].tap()
+        XCTAssertTrue(app.buttons["Cancel scanning"].waitForExistence(timeout: 5))
+        app.buttons["Cancel scanning"].tap()
+        app.buttons["Done"].tap()
+        app.terminate()
+        XCTAssertEqual(try Data(contentsOf: file), original)
+    }
+
+    private func requireKeychainOrPreserved(file: URL, original: Data) throws {
+        if app.staticTexts["This app’s signing configuration does not permit secure Keychain storage."].exists {
+            XCTAssertFalse(app.buttons["Accept pairing"].exists)
+            app.terminate()
+            XCTAssertEqual(try Data(contentsOf: file), original)
+            throw XCTSkip("Secure Keychain unavailable with this signing configuration; acceptance, restart and forget gates remain open.")
+        }
+    }
+
+    func testFreshPairingPreservesInitialWorkspace() throws {
+        app.launchEnvironment["TODO_P2P_PAIRING_FIXTURE"] = "1"
+        app.launch()
+        saved()
+        app.terminate()
+        let file = directory.appendingPathComponent("workspace.snapshot")
+        let original = try Data(contentsOf: file)
+        app.launch()
+        app.buttons["Pair devices"].tap()
+        app.buttons["Import test code"].tap()
+        try requireKeychainOrPreserved(file: file, original: original)
+        XCTAssertTrue(app.buttons["Accept pairing"].waitForExistence(timeout: 5), app.staticTexts.allElementsBoundByIndex.map(\.label).joined(separator: " | "))
+        app.buttons["Accept pairing"].tap()
+        XCTAssertTrue(app.staticTexts["Accepted pairing awaiting initial sync"].exists)
+        app.terminate()
+        XCTAssertEqual(try Data(contentsOf: file), original)
+        app.launch()
+        app.buttons["Pair devices"].tap()
+        XCTAssertTrue(app.staticTexts["Accepted pairing awaiting initial sync"].exists)
+        app.buttons["Forget pairing"].tap()
+        app.buttons["Forget on this device"].tap()
+    }
+
+    func testPairingPendingPreservesWorkspace() throws {
+        app.launchEnvironment["TODO_P2P_PAIRING_FIXTURE"] = "1"
+        app.launch()
+        addTodo("Keep local todo")
+        saved()
+        app.terminate()
+        let file = directory.appendingPathComponent("workspace.snapshot")
+        let original = try Data(contentsOf: file)
+        app.launch()
+        app.buttons["Pair devices"].tap()
+        app.buttons["Import malformed test code"].tap()
+        XCTAssertTrue(app.staticTexts["This is not a supported pairing code."].exists)
+        app.buttons["Import test code"].tap()
+        try requireKeychainOrPreserved(file: file, original: original)
+        XCTAssertTrue(app.buttons["Accept pairing"].exists)
+        app.buttons["Cancel import"].tap()
+        XCTAssertFalse(app.buttons["Accept pairing"].exists)
+        app.buttons["Import test code"].tap()
+        try requireKeychainOrPreserved(file: file, original: original)
+        XCTAssertTrue(app.buttons["Accept pairing"].waitForExistence(timeout: 5), app.staticTexts.allElementsBoundByIndex.map(\.label).joined(separator: " | "))
+        app.buttons["Accept pairing"].tap()
+        XCTAssertTrue(app.staticTexts["Accepted pairing awaiting initial sync"].waitForExistence(timeout: 5))
+        app.buttons["Import test code"].tap()
+        try requireKeychainOrPreserved(file: file, original: original)
+        XCTAssertTrue(app.buttons["Accept pairing"].waitForExistence(timeout: 5), app.staticTexts.allElementsBoundByIndex.map(\.label).joined(separator: " | "))
+        app.buttons["Accept pairing"].tap()
+        XCTAssertTrue(app.staticTexts["Accepted pairing awaiting initial sync"].exists)
+        app.terminate()
+        XCTAssertEqual(try Data(contentsOf: file), original)
+        app.launch()
+        app.buttons["Pair devices"].tap()
+        XCTAssertTrue(app.staticTexts["Accepted pairing awaiting initial sync"].exists)
+        app.buttons["Import test code"].tap()
+        XCTAssertTrue(app.staticTexts["Forget the existing pairing before accepting a different code."].exists)
+        app.buttons["Forget pairing"].tap()
+        app.buttons["Forget on this device"].tap()
+        XCTAssertFalse(app.staticTexts["Accepted pairing awaiting initial sync"].exists)
+        app.terminate()
+        XCTAssertEqual(try Data(contentsOf: file), original)
+        app.launch()
+        app.buttons["Pair devices"].tap()
+        XCTAssertFalse(app.buttons["Forget pairing"].exists)
+        app.buttons["Done"].tap()
+        XCTAssertTrue(app.staticTexts["Keep local todo"].exists)
     }
 
     func testCorruptOpeningPreservesBytes() throws {

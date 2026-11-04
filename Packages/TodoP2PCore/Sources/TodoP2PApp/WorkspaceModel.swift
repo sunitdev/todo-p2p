@@ -19,13 +19,18 @@ public final class WorkspaceModel {
     public private(set) var openingError: String?
     public private(set) var operationError: String?
     public private(set) var saveState: WorkspaceSaveState?
+    public private(set) var pairing: PairingModel?
+    public private(set) var documentID: String?
     private var store: WorkspaceStore?
     private let openStore: () throws -> WorkspaceStore
+    private let useConfiguredPairing: Bool
 
     public init() {
+        useConfiguredPairing = true
         openStore = {
             #if DEBUG
             let environment = ProcessInfo.processInfo.environment
+            _ = try PairingModel.configuredStore()
             if let path = environment["TODO_P2P_TEST_DIRECTORY"] {
                 guard path.hasPrefix("/"), path.contains("todo-p2p-test-") else {
                     throw CocoaError(.fileReadInvalidFileName)
@@ -40,7 +45,7 @@ public final class WorkspaceModel {
         }
     }
 
-    init(openStore: @escaping () throws -> WorkspaceStore) { self.openStore = openStore }
+    init(openStore: @escaping () throws -> WorkspaceStore) { self.openStore = openStore; useConfiguredPairing = false }
 
     package static func openOrCreate(directory: URL, io: any WorkspaceFileIO) throws -> WorkspaceStore {
         do {
@@ -57,6 +62,9 @@ public final class WorkspaceModel {
         defer { busy = false }
         do {
             store = try openStore()
+            documentID = store?.documentID.id
+            if useConfiguredPairing { pairing = try PairingModel(store: PairingModel.configuredStore()) }
+            pairing?.reload()
             try await refresh()
             openingError = nil
             ready = true

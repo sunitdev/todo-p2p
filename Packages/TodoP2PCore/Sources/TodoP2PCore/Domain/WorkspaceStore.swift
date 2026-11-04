@@ -88,7 +88,7 @@ public actor WorkspaceStore {
 
     public static func open(documentID: String, documentData: Data) throws -> WorkspaceStore {
         // the pinned base58 decoder traps on payloads shorter than its checksum
-        guard (20...28).contains(documentID.utf8.count), let identity = DocumentId(documentID) else {
+        guard let identity = WorkspaceIdentity.validate(documentID) else {
             throw WorkspaceOpeningError.invalidDocumentID
         }
         let document = try Document(documentData)
@@ -122,7 +122,7 @@ public actor WorkspaceStore {
     package static func open(directory: URL, io: any WorkspaceFileIO) throws -> WorkspaceStore {
         let persistence = WorkspacePersistence(directory: directory, io: io)
         let envelope = try persistence.load()
-        guard (20...28).contains(envelope.documentID.utf8.count), let identity = DocumentId(envelope.documentID) else {
+        guard let identity = WorkspaceIdentity.validate(envelope.documentID) else {
             throw WorkspaceOpeningError.invalidDocumentID
         }
         let document = try Document(envelope.documentData)
