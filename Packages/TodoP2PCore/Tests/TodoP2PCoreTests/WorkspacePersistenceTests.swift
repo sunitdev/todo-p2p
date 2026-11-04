@@ -4,7 +4,7 @@ import Testing
 @testable import TodoP2PCore
 
 final class FaultIO: WorkspaceFileIO, @unchecked Sendable {
-    enum Point { case none, read, write, replace, policy }
+    enum Point { case none, read, beforeWrite, partialWrite, write, replace, policy }
     private let lock = NSLock()
     private var point: Point = .none
     let real = LocalWorkspaceFileIO()
@@ -15,6 +15,11 @@ final class FaultIO: WorkspaceFileIO, @unchecked Sendable {
     func read(_ url: URL) throws -> Data { try check(.read); return try real.read(url) }
     func prepareDirectory(_ url: URL) throws { try real.prepareDirectory(url) }
     func writeCandidate(_ data: Data, to url: URL) throws {
+        try check(.beforeWrite)
+        if lock.withLock({ point == .partialWrite }) {
+            try real.writeCandidate(Data(data.prefix(max(1, data.count / 2))), to: url)
+            throw POSIXError(.ENOSPC)
+        }
         try real.writeCandidate(data, to: url)
         try check(.write)
     }
@@ -81,7 +86,7 @@ private func expectSame(_ snapshot: WorkspaceSnapshot, _ store: WorkspaceStore) 
     guard case .saved = await store.saveState else { Issue.record("not saved"); return }
 }
 
-@Test(arguments: [FaultIO.Point.write, .replace, .policy])
+@Test(arguments: [FaultIO.Point.beforeWrite, .partialWrite, .write, .replace, .policy])
 private func failedSaveRetry(point: FaultIO.Point) async throws {
     let directory = try temporaryWorkspace()
     defer { try? FileManager.default.removeItem(at: directory) }
@@ -150,6 +155,8 @@ private func failedSaveRetry(point: FaultIO.Point) async throws {
     #expect(resolved.path.contains("/Library/Application Support/"))
     #expect(!resolved.path.contains("Mobile Documents"))
     #expect(!resolved.path.contains("iCloud"))
+    #expect(resolved.lastPathComponent == "TodoP2P")
+    #expect(resolved.deletingLastPathComponent().lastPathComponent == "Application Support")
     let directory = try temporaryWorkspace()
     defer { try? FileManager.default.removeItem(at: directory) }
     let io = LocalWorkspaceFileIO()
@@ -178,4 +185,44 @@ private func failedSaveRetry(point: FaultIO.Point) async throws {
     #expect(try await reopened.readTodos().todos.first?.notes == "latest notes")
     try await expectSame(await store.serialize(), reopened)
     guard case .saved(revision: 3) = await store.saveState else { Issue.record("wrong saved revision"); return }
+}
+
+@Test(arguments: [FaultIO.Point.beforeWrite, .partialWrite, .write, .replace])
+private func failedCreationCanRetry(point: FaultIO.Point) async throws {
+    let directory = try temporaryWorkspace()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let io = FaultIO()
+    io.fail(point)
+    #expect(throws: POSIXError.self) { try WorkspaceStore.createNew(directory: directory, io: io) }
+    #expect(try FileManager.default.contentsOfDirectory(atPath: directory.path).isEmpty)
+    #expect(throws: WorkspaceStorageError.self) { try WorkspaceStore.open(directory: directory) }
+    io.fail(.none)
+    let store = try WorkspaceStore.createNew(directory: directory, io: io)
+    try await expectSame(await store.serialize(), WorkspaceStore.open(directory: directory))
+}
+
+@Test(arguments: [FaultIO.Point.beforeWrite, .partialWrite, .write, .replace, .policy])
+private func flushRetriesFailedRevision(point: FaultIO.Point) async throws {
+    let directory = try temporaryWorkspace()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let io = FaultIO()
+    let store = try WorkspaceStore.createNew(directory: directory, io: io)
+    let todo = try await store.addTodo(title: "before")
+    io.fail(point)
+    await #expect(throws: POSIXError.self) { try await store.editTitle(id: todo.id, title: "recoverable") }
+    guard case let .failed(revision, error) = await store.saveState else {
+        Issue.record("failure hidden")
+        return
+    }
+    #expect(revision == 2)
+    #expect((error as? POSIXError)?.code == (point == .partialWrite ? .ENOSPC : .EACCES))
+    #expect(try FileManager.default.contentsOfDirectory(atPath: directory.path) == ["workspace.snapshot"])
+    let snapshot = await store.serialize()
+    io.fail(.none)
+    try await store.flush()
+    guard case .saved(revision: 2) = await store.saveState else {
+        Issue.record("retry changed revision or did not save")
+        return
+    }
+    try await expectSame(snapshot, WorkspaceStore.open(directory: directory))
 }

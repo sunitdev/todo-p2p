@@ -103,7 +103,7 @@ struct WorkspacePersistence: Sendable {
     static func defaultDirectory() throws -> URL {
         try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask,
                                     appropriateFor: nil, create: false)
-            .appendingPathComponent("TodoP2P/Workspace", isDirectory: true)
+            .appendingPathComponent("TodoP2P", isDirectory: true)
     }
 
     func load() throws -> WorkspaceEnvelope {
