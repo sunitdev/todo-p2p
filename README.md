@@ -2,6 +2,15 @@
 
 A personal macOS and iPhone todo app being built for independent offline use and paired LAN synchronization, with no backend or cloud services.
 
+Start either app from the repository root:
+
+```sh
+make mac
+make iphone
+```
+
+`make iphone` prefers a booted iPhone Simulator, otherwise the newest available iOS 27+ iPhone. Use `make simulators` and `make iphone SIMULATOR=<UUID>` to choose one. A graphical Simulator window requires Simulator.app in the selected Xcode installation. Run `make help` for build targets and overrides.
+
 Build and test the shared package from the repository root (`LOCAL_BUILD` must be unset):
 
 ```sh
