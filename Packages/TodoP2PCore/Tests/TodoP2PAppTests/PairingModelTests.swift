@@ -18,7 +18,11 @@ import TodoP2PCore
 private final class ModelCredentials: PairingCredentialStore {
     var record: PairingRecord?
     var fail = false
-    func load() throws -> PairingRecord? { record }
+    var failRead = false
+    func load() throws -> PairingRecord? {
+        if failRead { throw PairingError.unavailable }
+        return record
+    }
     func add(_ record: PairingRecord) throws {
         if fail { throw PairingError.unavailable }
         self.record = record
@@ -78,3 +82,20 @@ private final class ModelCredentials: PairingCredentialStore {
     }
 }
 #endif
+
+@MainActor @Test func restorePairingCompatibilityFailsClosed() throws {
+    let credentials = ModelCredentials()
+    let model = PairingModel(store: credentials)
+    let current = try WorkspaceStore.createNew().documentID.id
+    let other = try WorkspaceStore.createNew().documentID.id
+    try model.validateRestore(currentID: current, restoredID: other)
+    model.showOwner(documentID: current)
+    let original = credentials.record
+    try model.validateRestore(currentID: current, restoredID: current)
+    #expect(throws: WorkspaceTransferError.self) { try model.validateRestore(currentID: current, restoredID: other) }
+    credentials.failRead = true
+    #expect(throws: PairingError.self) { try model.validateRestore(currentID: current, restoredID: current) }
+    #expect(throws: PairingError.self) { try model.validateRestore(currentID: current, restoredID: other) }
+    let unchanged = credentials.record == original
+    #expect(unchanged)
+}

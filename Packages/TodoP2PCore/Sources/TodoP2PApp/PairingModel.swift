@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import Security
 import TodoP2PCore
 
 @MainActor @Observable
@@ -28,6 +29,46 @@ public final class PairingModel {
         #endif
         return KeychainPairingStore(service: "local.sunit.TodoP2P.pairing", account: "current")
     }
+
+    func validateRestore(currentID: String, restoredID: String) throws {
+        let existing = try store.load()
+        if currentID != restoredID, existing != nil { throw WorkspaceTransferError.pairedIdentity }
+    }
+
+    #if DEBUG
+    public private(set) var integrationResult: String?
+    public func checkIsolatedKeychain(documentID: String) {
+        let env = ProcessInfo.processInfo.environment
+        guard env["TODO_P2P_PAIRING_FIXTURE"] == "1",
+              let namespace = env["TODO_P2P_TEST_KEYCHAIN"],
+              env["TODO_P2P_TEST_DIRECTORY"] == "/tmp/" + namespace,
+              namespace.hasPrefix("todo-p2p-test-"),
+              UUID(uuidString: String(namespace.dropFirst("todo-p2p-test-".count))) != nil,
+              let keychain = store as? KeychainPairingStore else { return }
+        do {
+            guard try keychain.load() == nil else { throw PairingError.duplicate }
+            defer { try? keychain.delete() }
+            let first = try PairingCredentials.owner(documentID: documentID, store: keychain)
+            guard try keychain.load() == first else { throw PairingError.corruptCredential }
+            var query = keychain.query
+            query[kSecReturnAttributes as String] = true
+            var result: CFTypeRef?
+            let status = SecItemCopyMatching(query as CFDictionary, &result)
+            guard status == errSecSuccess else {
+                integrationResult = "Keychain attribute status: \(status)"
+                return
+            }
+            guard let attributes = result as? [String: Any],
+                  attributes[kSecAttrSynchronizable as String] as? Bool == false,
+                  attributes[kSecAttrAccessible as String] as? String == kSecAttrAccessibleWhenUnlockedThisDeviceOnly as String else {
+                throw PairingError.corruptCredential
+            }
+            try keychain.delete()
+            guard try keychain.load() == nil else { throw PairingError.corruptCredential }
+            integrationResult = "Secure storage integration passed"
+        } catch { integrationResult = error.localizedDescription }
+    }
+    #endif
 
     public func reload() { perform { record = try store.load() } }
     public func showOwner(documentID: String) {

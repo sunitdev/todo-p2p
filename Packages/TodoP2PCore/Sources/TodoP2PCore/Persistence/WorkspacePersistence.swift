@@ -27,6 +27,7 @@ package protocol WorkspaceFileIO: Sendable {
     func writeCandidate(_ data: Data, to url: URL) throws
     func promote(_ candidate: URL, to destination: URL, exclusive: Bool) throws
     func verifyPolicy(_ url: URL, directory: Bool) throws
+    func exchange(_ first: URL, with second: URL) throws
     func removeCandidate(_ url: URL)
 }
 
@@ -131,5 +132,16 @@ struct WorkspacePersistence: Sendable {
         try io.writeCandidate(data, to: candidate)
         try io.promote(candidate, to: file, exclusive: exclusive)
         try io.verifyPolicy(file, directory: false)
+    }
+}
+
+package extension WorkspaceFileIO {
+    func exchange(_ first: URL, with second: URL) throws {
+        let result = first.withUnsafeFileSystemRepresentation { source in
+            second.withUnsafeFileSystemRepresentation { target in
+                renamex_np(source!, target!, UInt32(RENAME_SWAP))
+            }
+        }
+        guard result == 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
     }
 }

@@ -102,6 +102,77 @@ public final class WorkspaceModel {
         if let selection, !ids.contains(selection) { self.selection = nil }
     }
 
+    public private(set) var generation: UInt64 = 0
+    public private(set) var transferMessage: String?
+    public private(set) var restorePreview: String?
+    private var restoreData: Data?
+
+    public func exportData() async throws -> Data {
+        guard !busy, let store else { throw WorkspaceTransferError.retiredStore }
+        return try await store.exportWorkspace()
+    }
+
+    public func reportTransfer(_ result: Result<URL, Error>) {
+        switch result {
+        case .success: transferMessage = "Exported current workspace. Editor drafts are excluded."
+        case .failure(let error): transferMessage = Self.message(for: error)
+        }
+    }
+
+    public func exportWorkspace(to url: URL) async {
+        guard !busy, let store else { return }
+        busy = true
+        defer { busy = false }
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        do {
+            try await store.validateExportDestination(url)
+            let bytes = try await store.exportWorkspace()
+            try bytes.write(to: url, options: .atomic)
+            transferMessage = "Exported current workspace. Editor drafts are excluded."
+        } catch { transferMessage = Self.message(for: error) }
+    }
+
+    public func previewRestore(from url: URL) async {
+        guard !busy else { return }
+        busy = true
+        defer { busy = false }
+        cancelRestore()
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        do {
+            let data = try Data(contentsOf: url)
+            let snapshot = try WorkspaceArchive.decode(data)
+            let candidate = try WorkspaceStore.open(documentID: snapshot.documentID, documentData: snapshot.documentData)
+            let result = try await candidate.readTodos()
+            restoreData = data
+            restorePreview = "Workspace \(snapshot.documentID) · \(result.todos.count) todos · \(result.diagnostics.count) diagnostics. Replace the current workspace and discard editor drafts? The original is retained in protected RestoreRecovery storage."
+        } catch { transferMessage = Self.message(for: error) }
+    }
+
+    public func cancelRestore() { restoreData = nil; restorePreview = nil }
+
+    public func confirmRestore() async {
+        guard !busy, let store, let data = restoreData, let documentID else { return }
+        busy = true
+        defer { busy = false }
+        do {
+            let snapshot = try WorkspaceArchive.decode(data)
+            try pairing?.validateRestore(currentID: documentID, restoredID: snapshot.documentID)
+            let replacement = try await store.restoreWorkspace(data)
+            generation += 1
+            self.store = replacement.store
+            self.documentID = replacement.store.documentID.id
+            drafts = [:]
+            selection = nil
+            creationTitle = ""
+            cancelRestore()
+            transferMessage = "Workspace restored. Original retained at \(replacement.recoveryDirectory.path)"
+            do { try await refresh() }
+            catch { transferMessage = "Restore committed. Reopen the app to refresh the workspace." }
+        } catch { transferMessage = Self.message(for: error) }
+    }
+
     public func draft(for id: String) -> TodoDraft {
         drafts[id] ?? todos.first(where: { $0.id == id }).map { TodoDraft(title: $0.title, notes: $0.notes) }
             ?? TodoDraft(title: "", notes: "")

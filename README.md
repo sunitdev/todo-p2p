@@ -30,5 +30,8 @@ open DerivedData/Build/Products/Debug/TodoP2PMac.app
 
 xcodebuild -project TodoP2P.xcodeproj -scheme TodoP2PiOS -configuration Debug \
   -destination 'generic/platform=iOS Simulator' -derivedDataPath DerivedData \
-  CODE_SIGNING_ALLOWED=NO build
+  ONLY_ACTIVE_ARCH=YES ARCHS=arm64 CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual build
 ```
+Use Export workspace and Restore workspace for explicit local snapshots. Exports contain personal data and exclude editor drafts and pairing credentials. Choose a local destination. Restore retains the original in protected `RestoreRecovery` storage.
+
+Simulator signing supplies an application context for Keychain tests. The ad hoc Mac build above cannot qualify secure pairing without appropriate signing entitlements.

@@ -68,6 +68,7 @@ enum WorkspaceSyncError: Error {
 public actor WorkspaceStore {
     public nonisolated let documentID: DocumentId
     private let document: Document
+    private var retired = false
     private var persistence: WorkspacePersistence?
     private var revision: UInt64 = 0
     public private(set) var saveState: WorkspaceSaveState = .unsaved(revision: 0)
@@ -140,6 +141,7 @@ public actor WorkspaceStore {
     }
 
     public func flush() throws {
+        guard !retired else { throw WorkspaceTransferError.retiredStore }
         guard let persistence else { return }
         let snapshot = serialize()
         let savingRevision = revision
@@ -154,6 +156,7 @@ public actor WorkspaceStore {
     }
 
     private func changing<T>(_ operation: () throws -> T) throws -> T {
+        guard !retired else { throw WorkspaceTransferError.retiredStore }
         let before = document.heads()
         let result: T
         do { result = try operation() }
@@ -175,6 +178,39 @@ public actor WorkspaceStore {
 
     public func serialize() -> WorkspaceSnapshot {
         WorkspaceSnapshot(documentID: documentID.id, documentData: document.save())
+    }
+
+    public func validateExportDestination(_ url: URL) throws {
+        guard let persistence else { return }
+        let root = persistence.directory.resolvingSymlinksInPath().standardizedFileURL.path
+        let target = url.resolvingSymlinksInPath().standardizedFileURL.path
+        guard target != root, !target.hasPrefix(root + "/") else { throw WorkspaceTransferError.protectedDestination }
+    }
+
+    public func exportWorkspace() throws -> Data {
+        try WorkspaceArchive.encode(serialize())
+    }
+
+    public func restoreWorkspace(_ data: Data) throws -> WorkspaceReplacement {
+        guard !retired, let persistence else { throw WorkspaceTransferError.retiredStore }
+        let snapshot = try WorkspaceArchive.decode(data)
+        let document = try Document(snapshot.documentData)
+        let replacement = WorkspaceStore(documentID: WorkspaceIdentity.validate(snapshot.documentID)!, document: document, persistence: persistence)
+        let recovery = persistence.directory.appendingPathComponent("RestoreRecovery/\(UUID())", isDirectory: true)
+        let io = persistence.io
+        try io.prepareDirectory(recovery)
+        var committed = false
+        defer { if !committed { try? FileManager.default.removeItem(at: recovery) } }
+        let original = recovery.appendingPathComponent("previous-persisted.todop2p")
+        let memory = recovery.appendingPathComponent("previous-current.todop2p")
+        try io.writeCandidate(WorkspaceArchive.encode(serialize()), to: memory)
+        try io.writeCandidate(WorkspaceArchive.encode(snapshot), to: original)
+        try io.verifyPolicy(original, directory: false)
+        try io.exchange(original, with: persistence.file)
+        committed = true
+        retired = true
+        self.persistence = nil
+        return WorkspaceReplacement(store: replacement, recoveryDirectory: recovery)
     }
 
     var writerActor: ActorId { document.actor }

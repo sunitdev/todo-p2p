@@ -293,7 +293,7 @@ final class WorkspaceUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Forget the existing pairing before accepting a different code."].exists)
         app.buttons["Forget pairing"].tap()
         app.buttons["Forget on this device"].tap()
-        XCTAssertFalse(app.staticTexts["Accepted pairing awaiting initial sync"].exists)
+        XCTAssertTrue(app.staticTexts["Accepted pairing awaiting initial sync"].waitForNonExistence(timeout: 5))
         app.terminate()
         XCTAssertEqual(try Data(contentsOf: file), original)
         app.launch()
@@ -301,6 +301,31 @@ final class WorkspaceUITests: XCTestCase {
         XCTAssertFalse(app.buttons["Forget pairing"].exists)
         app.buttons["Done"].tap()
         XCTAssertTrue(app.staticTexts["Keep local todo"].exists)
+    }
+
+    func testApplicationKeychainIntegration() throws {
+        app.launchEnvironment["TODO_P2P_PAIRING_FIXTURE"] = "1"
+        app.launch()
+        saved()
+        app.buttons["Check secure storage"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["Secure storage integration passed"].waitForExistence(timeout: 5))
+    }
+
+    func testTransferPickerCancellationPreservesWorkspace() throws {
+        app.launch()
+        saved()
+        let file = directory.appendingPathComponent("workspace.snapshot")
+        let original = try Data(contentsOf: file)
+        app.buttons["Export workspace"].firstMatch.tap()
+        let cancel = app.buttons.matching(NSPredicate(format: "label IN %@", ["Cancel", "Close"])).firstMatch
+        XCTAssertTrue(cancel.waitForExistence(timeout: 10), app.debugDescription)
+        cancel.tap()
+        XCTAssertTrue(cancel.waitForNonExistence(timeout: 5))
+        app.buttons["Restore workspace"].firstMatch.tap()
+        XCTAssertTrue(cancel.waitForExistence(timeout: 10), app.debugDescription)
+        cancel.tap()
+        relaunch()
+        XCTAssertEqual(try Data(contentsOf: file), original)
     }
 
     func testCorruptOpeningPreservesBytes() throws {

@@ -6,8 +6,14 @@ import TodoP2PCore
 final class TestIO: WorkspaceFileIO, @unchecked Sendable {
     private let lock = NSLock()
     private var failing = false
+    private var exchangeFailure = false
     let real = LocalWorkspaceFileIO()
     func fail(_ value: Bool) { lock.withLock { failing = value } }
+    func failExchange(_ value: Bool) { lock.withLock { exchangeFailure = value } }
+    func exchange(_ first: URL, with second: URL) throws {
+        if lock.withLock({ exchangeFailure }) { throw POSIXError(.EIO) }
+        try real.exchange(first, with: second)
+    }
     func read(_ url: URL) throws -> Data { try real.read(url) }
     func prepareDirectory(_ url: URL) throws { try real.prepareDirectory(url) }
     func writeCandidate(_ data: Data, to url: URL) throws {
@@ -112,4 +118,41 @@ final class TestIO: WorkspaceFileIO, @unchecked Sendable {
     await rejected.start()
     #expect(!rejected.ready)
     #expect(try Data(contentsOf: file) == bytes)
+}
+
+@MainActor @Test func exportRetainsSaveFailureAndRestoreDiscardsDraftsOnlyOnCommit() async throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent("todo-p2p-test-\(UUID())")
+    let export = FileManager.default.temporaryDirectory.appendingPathComponent("todo-p2p-test-\(UUID()).todop2p")
+    defer { try? FileManager.default.removeItem(at: directory); try? FileManager.default.removeItem(at: export) }
+    let io = TestIO()
+    let model = WorkspaceModel { try WorkspaceStore.createNew(directory: directory, io: io) }
+    await model.start()
+    io.fail(true)
+    model.creationTitle = "unsaved 🌱"
+    await model.add()
+    let id = try #require(model.selection)
+    model.drafts[id] = TodoDraft(title: "draft", notes: "unapplied")
+    await model.exportWorkspace(to: export)
+    guard case .failed = model.saveState else { Issue.record("export cleared save error"); return }
+    let snapshot = try WorkspaceArchive.decode(Data(contentsOf: export))
+    let candidate = try WorkspaceStore.open(documentID: snapshot.documentID, documentData: snapshot.documentData)
+    #expect(try await candidate.readTodos().todos.first?.title == "unsaved 🌱")
+    await model.previewRestore(from: export)
+    model.cancelRestore()
+    #expect(model.drafts[id]?.title == "draft")
+    await model.previewRestore(from: export)
+    await model.confirmRestore()
+    #expect(model.drafts[id]?.title == "draft")
+    #expect(model.restorePreview != nil)
+    io.fail(false)
+    io.failExchange(true)
+    let original = try Data(contentsOf: directory.appendingPathComponent("workspace.snapshot"))
+    await model.confirmRestore()
+    #expect(try Data(contentsOf: directory.appendingPathComponent("workspace.snapshot")) == original)
+    #expect(model.drafts[id]?.title == "draft")
+    io.failExchange(false)
+    await model.confirmRestore()
+    #expect(model.drafts.isEmpty)
+    #expect(model.restorePreview == nil)
+    #expect(model.todos.first?.title == "unsaved 🌱")
 }

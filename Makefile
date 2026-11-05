@@ -22,7 +22,7 @@ mac: build-mac
 	fi
 
 build-iphone:
-	env -u LOCAL_BUILD xcodebuild -project TodoP2P.xcodeproj -scheme TodoP2PiOS -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath "$(DERIVED_DATA)/iOS" CODE_SIGNING_ALLOWED=NO build
+	env -u LOCAL_BUILD xcodebuild -project TodoP2P.xcodeproj -scheme TodoP2PiOS -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath "$(DERIVED_DATA)/iOS" ONLY_ACTIVE_ARCH=YES ARCHS=arm64 CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual build
 
 iphone: build-iphone
 	@test -n "$(SIMULATOR)" || { printf '%s\n' 'No compatible iPhone Simulator found. Install an iOS 27+ runtime in Xcode.' >&2; exit 1; }
